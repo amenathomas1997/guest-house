@@ -923,6 +923,7 @@ final class VMManager: ObservableObject {
         let found = listing.output.uppercased().contains("AVMDONE")
         avmLog("checkInstallCompleteMarker: marker \(found ? "PRESENT" : "absent") on \(imgPath)")
         if found, configuration.installMarkerSeen != true {
+            UsageCounts.note(configuration.guestOS == .windows ? .installFinishedWindows : .installFinishedLinux)   // fork-only-line
             // Remembered (2026-10-28): see below. Only for a machine in the
             // list (fourth audit: a test job's isn't).
             if var updated = VMStore.shared?.configurations.first(where: { $0.id == configuration.id }) {
@@ -1240,6 +1241,7 @@ final class VMManager: ObservableObject {
 
         do {
             let output = try await runMediaBuild(for: configuration) { try await pipeline.run(input) }
+            UsageCounts.note(.installStartedWindows)   // fork-only-line
             avmLog("ensureInstallMedia: pipeline complete — \(output.rebuiltISOPath)")
             WindowsSetupAnswers.forgetPassword(inVMDirectory: runtimeDir)
             // Not after a Force Stop during the build (2026-10-28, code
@@ -1262,6 +1264,7 @@ final class VMManager: ObservableObject {
                 throw CancellationError()
             }
             avmLog("ensureInstallMedia: pipeline FAILED: \(error.localizedDescription)")
+            UsageCounts.note(.installMediaFailedWindows)   // fork-only-line
             appendConsole("Guest House: Install media build failed: \(error.localizedDescription)\n")
             Announcer.shared.announce(
                 "Install media build failed. \(error.localizedDescription)",
@@ -1315,6 +1318,7 @@ final class VMManager: ObservableObject {
                 diskName: configuration.usesVirtioDisk ? "vda" : "nvme0n1"
             )
             try await runMediaBuild(for: configuration) { try await pipeline.run(ubuntuInput) }
+            UsageCounts.note(.installStartedLinux)   // fork-only-line
             // Not after a Force Stop during the build (2026-10-28, code
             // review): the next check ends the start.
             guard buildIsWanted else { return }
@@ -1331,6 +1335,7 @@ final class VMManager: ObservableObject {
                 throw CancellationError()
             }
             avmLog("ensureUbuntuInstallMedia: pipeline FAILED: \(error.localizedDescription)")
+            UsageCounts.note(.installMediaFailedLinux)   // fork-only-line
             appendConsole("Guest House: Install media build failed: \(error.localizedDescription)\n")
             Announcer.shared.announce(
                 "Install media build failed. \(error.localizedDescription)",
@@ -1753,6 +1758,7 @@ final class VMManager: ObservableObject {
 
         state = .running
         startedAt = Date()
+        UsageCountsSender.noteStart(configuration)   // fork-only-line
         appendConsole("Guest House: VM is running.\n")
         beginQMPEventMonitoring()
         // Before the guest makes a sound, and after a resume too: QEMU doesn't
@@ -2451,6 +2457,7 @@ final class VMManager: ObservableObject {
                     let minutes = (minutesSinceFailureMarker ?? -1) + 1
                     minutesSinceFailureMarker = minutes
                     if minutes == 0 { avmLog("ubuntuStallWatch: AVMFAIL.TAG appeared; waiting for the installer's power-off") }
+                    if minutes == 0 { UsageCounts.note(.installFailedLinux) }   // fork-only-line
                     if minutes >= 3 {
                         avmLog("ubuntuStallWatch: AVMFAIL.TAG present and still running after 3 minutes — stopping the VM")
                         await MainActor.run {
@@ -5011,6 +5018,7 @@ extension VMManager {
     /// from there. Returns true if it was saved. Spoken either way.
     @discardableResult
     func saveStateAndStop() async -> Bool {
+        UsageCounts.note(.saveResume)   // fork-only-line
         if let saving = savingTask { return await saving.value }
         // Said (2026-10-29, seventh audit): Save during a restore point did
         // nothing, without a word.
@@ -5705,6 +5713,7 @@ extension VMManager {
     /// True if it arrived.
     @discardableResult
     func sendFile(_ file: URL) async -> Bool {
+        UsageCounts.note(.sendFile)   // fork-only-line
         let machine = machineName
         guard state == .running, let configuration = activeConfiguration else {
             Announcer.shared.announce("\(machine) isn't running, so nothing was sent.", tone: .failure)

@@ -260,11 +260,18 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        // fork-only
+        ReleaseNote(version: "0.4.51", changes: [
+            "If you agreed to share anonymous usage counts, Guest House will ask one more question: whether to add a little more to that daily message. If you choose Keep It As It Is, it goes on sending only what you agreed to before. If you haven't been asked about usage counts yet, you'll get one question that covers everything.",
+            "The extra part would be: which features were used since the last message, by name only, such as a shared folder, Save or Install Apps; whether installs of Windows or Linux started, finished or failed; which screen readers your machines were set up with; whether Guest House closed unexpectedly; and roughly how long you have used it. This shows me what people rely on and where installs go wrong.",
+            "As before, it never sends your name, an install number, your machines' names, anything you type, or any files. Settings, under General, has a switch for each part and shows what today's message would hold, and every message sent is written to the diagnostic log.",
+        ]),
         ReleaseNote(version: "0.4.50", changes: [
             "Guest House will ask you one question: whether to share anonymous usage counts with Full Circle AT. Nothing is shared unless you choose Share Anonymous Counts. It helps me know how many people use Guest House and which systems they run, so I know what to work on.",
             "If you say yes, Guest House sends one small message a day with only this: its version, your macOS version, your language, how many Windows, Linux and macOS machines you have, and whether it is this copy's first message ever, this week and this month. It never sends your name, an install number, your machines' names, anything you type, or any files, and the website keeps daily totals only, not your internet address.",
             "You can change your answer any time in Guest House's Settings, under General, where it also shows what today's message would hold. Every message that is sent is written to the diagnostic log.",
         ]),
+        // /fork-only
         ReleaseNote(version: "0.4.49", changes: [
             "A shared folder no longer needs a restart. Choose a folder in a machine's Settings and press Save, and a machine that is running gets it straight away; Guest House says so. Before, Windows showed \"This folder is empty\" until it had been shut down and started again. If File Explorer still shows the old contents, press F5.",
             "Install Apps, in the Virtual Machine menu, now works in Linux machines too. It lists the apps your Linux system's own software sources have, up to 17 of them, such as Firefox, Thunderbird, LibreOffice, VLC, Audacity, calibre and KeePassXC, and installs the ones you tick with no questions. This was tested in Debian; in Ubuntu, Fedora and the others it uses the same steps with that system's own package manager.",

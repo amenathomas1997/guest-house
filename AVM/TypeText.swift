@@ -80,6 +80,7 @@ extension VMManager {
     /// mixing their keys, and a stop or failure part way read as success
     /// (2026-11-01 audit).
     func typeText(_ text: String) async -> (typed: Int, skipped: Int, stopped: Bool)? {
+        UsageCounts.note(.typeClipboard)   // fork-only-line
         guard case .running = state, !isTypingText else { return nil }
         isTypingText = true
         typingStopAsked = false

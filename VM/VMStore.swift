@@ -654,6 +654,7 @@ nonisolated enum RestorePoints {
     }
 
     static func create(vmDirectory dir: URL, label: String, secureBoot: Bool, diskBus: String? = nil) async throws -> RestorePoint {
+        UsageCounts.note(.restorePoint)   // fork-only-line
         let tag = newTag()
         // The folder first, as the running path does (2026-11-05, second audit):
         // a quit between the snapshot and the folder left a point with no

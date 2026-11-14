@@ -161,6 +161,8 @@ for mine in AVM/FromAVM.swift AVM/UsageCountsSender.swift; do
 done
 # (Nothing to change, as in a tree that already has her identity, is fine.)
 # Fork-only Swift and shell first: the blocks name this fork's old identifier.
+# Single lines marked fork-only-line (the usage counts' notes) go whole.
+{ git grep -lzI -e "fork-only-line" -- '*.swift' || true; } | xargs -0 sed -i '' -e '/fork-only-line/d'
 { git grep -lzI -e "# fork-only" -- 'Tools/*.sh' || true; } | xargs -0 perl -0pi -e 's{^[ \t]*# fork-only\n.*?^[ \t]*# /fork-only\n}{}gms'
 { git grep -lzI -e "// fork-only" -- '*.swift' || true; } | xargs -0 perl -0pi -e 's{^[ \t]*// fork-only\n.*?^[ \t]*// /fork-only\n}{}gms'
 { git grep -lzI -e "com.fullcircleat" -e "9G2D7CDZ5D" -e "amenathomas1997" -e "fullcircleat-avm" -- . ':!*.msi' || true; } \

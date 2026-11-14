@@ -1505,11 +1505,20 @@ any time in Guest House's Settings (Command-Comma), under General, with
 With it on, Guest House sends one small message a day, and only this: its
 version, your macOS version, your language, how many Windows, Linux and
 macOS machines you have, and whether it is this copy's first message ever,
-this week and this month. It never sends your name, an install number,
-your machines' names, anything you type, or any files, and the website
-keeps daily totals only, not your internet address. Settings shows what
-today's message would hold, and every message sent is written to the
-diagnostic log in full.
+this week and this month.
+
+A second switch, **Include features used, install results and unexpected
+quits**, adds a little more, and is asked about separately if you had
+already said yes: which features were used since the last message, by
+fixed names only (a shared folder, Save, Install Apps and so on); whether
+installs of Windows or Linux started, finished or failed; which screen
+readers your machines were set up with; whether Guest House closed
+unexpectedly; and roughly how long you have used it.
+
+It never sends your name, an install number, your machines' names,
+anything you type, or any files, and the website keeps daily totals only,
+not your internet address. Settings shows what today's message would
+hold, and every message sent is written to the diagnostic log in full.
 
 <!-- /fork-only -->
 ### What Guest House records, and what it never records

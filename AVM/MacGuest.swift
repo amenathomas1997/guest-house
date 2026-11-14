@@ -420,6 +420,7 @@ final class MacGuestRunner: NSObject, ObservableObject, VZVirtualMachineDelegate
     private var name = "macOS"
 
     func start(_ config: VMConfiguration, attempt: Int = 1, takesKeyboard: Bool = true) {
+        if attempt == 1 { UsageCounts.note(.macMachineStarted) }   // fork-only-line
         if attempt == 1 { entersOnStart = takesKeyboard }
         if runningID == config.id {
             window?.makeKeyAndOrderFront(nil)

@@ -21,6 +21,7 @@ extension VMManager {
 
     /// The text on the machine's screen now, or nil when there's no picture.
     func readScreenText() async -> String? {
+        UsageCounts.note(.readScreen)   // fork-only-line
         guard let path = await captureScreendump() else { return nil }
         // Nothing kept, as the header says (2026-11-01, audit: it stayed
         // beside the machine until the next read).

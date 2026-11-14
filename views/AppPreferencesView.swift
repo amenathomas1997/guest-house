@@ -77,6 +77,7 @@ struct AppPreferencesView: View {
     @AppStorage(UpdateChannels.earlyKey) private var earlyUpdates = false
     // fork-only
     @AppStorage(UsageCounts.choiceKey) private var usageCountsChoice = ""
+    @AppStorage(UsageCounts.detailKey) private var usageCountsDetail = ""
     // /fork-only
     @AppStorage(ClaudeDescribe.enabledKey) private var describeWithClaude = false
     @State private var claudeKeyText = ""
@@ -136,10 +137,16 @@ struct AppPreferencesView: View {
                 get: { usageCountsChoice == "yes" },
                 set: { UsageCountsSender.set($0) }))
                 .accessibilityHint("Once a day, tells Full Circle AT that a copy of Guest House is in use, with no name or install number")
-            Text("With this on, Guest House sends one small message a day, so I know how many people use it and what they run. It holds only what follows, and never your name, an install number, your machines' names, anything you type, or any files. Every message is also written to the diagnostic log.")
+            Text("With this on, Guest House sends one small message a day, so I know how many people use it and what they run. It holds only what is listed below, and never your name, an install number, your machines' names, anything you type, or any files. Every message is also written to the diagnostic log.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
-            if let example = UsageCountsSender.todaysMessage(ignoringLast: true) {
+            if usageCountsChoice == "yes" {
+                Toggle("Include features used, install results and unexpected quits", isOn: Binding(
+                    get: { usageCountsDetail == "yes" },
+                    set: { UsageCountsSender.setDetail($0) }))
+                    .accessibilityHint("Adds which features were used by name, whether installs finished, which screen readers your machines have, and roughly how long you have used Guest House")
+            }
+            if let example = UsageCountsSender.todaysMessage(ignoringLast: true, withDetail: usageCountsChoice == "yes" && usageCountsDetail == "yes") {
                 Text("What it would send today: \(UsageCounts.summary(example)).")
                     .font(.callout)
                     .fixedSize(horizontal: false, vertical: true)

@@ -24,6 +24,7 @@ extension VMManager {
 
     /// Virtual Machine > Describe Screen.
     func describeScreen() async {
+        UsageCounts.note(.describeScreen)   // fork-only-line
         let machine = machineName
         let captured = await captureScreendump()
         defer { if let captured { try? FileManager.default.removeItem(atPath: captured) } }

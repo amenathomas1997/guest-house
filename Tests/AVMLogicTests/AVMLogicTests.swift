@@ -2053,6 +2053,52 @@ final class GuestWatchTests: XCTestCase {
         XCTAssertEqual(UsageCounts.day(at(2026, 11, 1, 0), in: zone), "2026-11-01")
         XCTAssertTrue(UsageCounts.address.hasPrefix("https://"))
     }
+
+    /// The fuller message (2026-11-14): names only, counted on this Mac
+    /// until a message carrying them has arrived.
+    func testUsageCountsNotesAndDetail() throws {
+        let suite = "usage-counts-test-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        UsageCounts.note(.machineStarted, in: defaults)
+        UsageCounts.note(.machineStarted, in: defaults)
+        UsageCounts.note(.sharedFolder, in: defaults)
+        UsageCounts.note(.installStartedWindows, in: defaults)
+        UsageCounts.note(.installFinishedWindows, in: defaults)
+        UsageCounts.note(.installFailedLinux, in: defaults)
+        UsageCounts.note(.unexpectedQuit, in: defaults)
+        let notes = UsageCounts.notes(in: defaults)
+        XCTAssertEqual(notes["machine_started"], 2)
+        let detail = UsageCounts.detail(notes: notes.merging(["something_unknown": 4, "a name: Amena's PC": 1]) { a, _ in a },
+                                        readers: ["NVDA", "jaws", "orca", "orca", "Somebody's reader"], age: "month")
+        XCTAssertEqual(detail.used, ["machine_started", "shared_folder"], "used holds names, once each, and nothing unknown")
+        XCTAssertEqual(detail.installs, ["install_started_windows": 1, "install_finished_windows": 1, "install_failed_linux": 1])
+        XCTAssertEqual(detail.unexpectedQuits, 1)
+        XCTAssertEqual(detail.readers, ["jaws", "nvda", "orca"])
+        // While a message travels, something more is noted: it stays for the next.
+        UsageCounts.note(.sendFile, in: defaults)
+        UsageCounts.forget(notes, in: defaults)
+        XCTAssertEqual(UsageCounts.notes(in: defaults), ["send_file": 1])
+        // Every name is plain, and the short message has none of this.
+        for note in UsageCounts.Note.allCases {
+            XCTAssertTrue(note.rawValue.allSatisfy { $0.isLowercase || $0 == "_" }, note.rawValue)
+        }
+        var message = try XCTUnwrap(UsageCounts.message(lastSent: nil, now: Date(), version: "0.4.51", macOS: "27.3", language: "en", windows: 1, linux: 0, macOSMachines: 0))
+        let short = try XCTUnwrap(JSONSerialization.jsonObject(with: UsageCounts.body(message)) as? [String: Any])
+        XCTAssertNil(short["used"]); XCTAssertNil(short["installs"]); XCTAssertNil(short["age"])
+        message.detail = detail
+        let full = try XCTUnwrap(JSONSerialization.jsonObject(with: UsageCounts.body(message)) as? [String: Any])
+        XCTAssertEqual(Set(full.keys), ["version", "macos", "language", "first_ever", "first_this_week", "first_this_month", "machines",
+                                         "used", "installs", "unexpected_quits", "readers", "age"])
+        // In use for: under a week, a month, three months, or more.
+        let now = Date()
+        func ago(_ days: Int) -> String { UsageCounts.day(now.addingTimeInterval(-Double(days) * 86_400)) }
+        XCTAssertEqual(UsageCounts.age(firstDay: ago(2), now: now), "week")
+        XCTAssertEqual(UsageCounts.age(firstDay: ago(12), now: now), "month")
+        XCTAssertEqual(UsageCounts.age(firstDay: ago(45), now: now), "quarter")
+        XCTAssertEqual(UsageCounts.age(firstDay: ago(200), now: now), "older")
+        XCTAssertEqual(UsageCounts.age(firstDay: nil, now: now), "week")
+    }
     // /fork-only
 
     /// What a Linux machine says about the list (2026-11-14): only what its

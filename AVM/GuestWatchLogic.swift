@@ -545,6 +545,88 @@ nonisolated enum UsageCounts {
     static let choiceKey = "UsageCountsChoice"
     /// The day of the last message that arrived, as yyyy-MM-dd.
     static let lastSentKey = "UsageCountsLastSent"
+    /// "yes" or "no" to the fuller message (2026-11-14, later the same day):
+    /// which features were used, whether installs finished, which screen
+    /// readers the machines have, unexpected quits, and roughly how long
+    /// this copy has been in use. Asked separately of people who had
+    /// already said yes to the short one.
+    static let detailKey = "UsageCountsDetail"
+    /// What has happened since the last message that arrived: a name and
+    /// how many times. Kept on this Mac whatever the answers are, and only
+    /// ever sent with a yes to the fuller message.
+    static let notesKey = "UsageCountsNotes"
+    /// The day this copy first ran with usage counts in it.
+    static let firstDayKey = "UsageCountsFirstDay"
+    /// False while Guest House runs, true once it has quit in good order.
+    static let closedCleanlyKey = "UsageCountsClosedCleanly"
+
+    /// Everything that can be noted, by its fixed name. Nothing free-form:
+    /// no machine's name, no file's, no text.
+    enum Note: String, CaseIterable, Sendable {
+        case machineStarted = "machine_started", macMachineStarted = "mac_machine_started"
+        case sharedFolder = "shared_folder", windowsKeyboard = "windows_keyboard", remoteDesktop = "remote_desktop"
+        case printers, camera
+        case saveResume = "save_resume", restorePoint = "restore_point", exportImport = "export_import"
+        case sendFile = "send_file", typeClipboard = "type_clipboard", readScreen = "read_screen", describeScreen = "describe_screen"
+        case usbDevice = "usb_device", bluetoothDevice = "bluetooth_device", installApps = "install_apps"
+        case installStartedWindows = "install_started_windows", installFinishedWindows = "install_finished_windows", installMediaFailedWindows = "install_media_failed_windows"
+        case installStartedLinux = "install_started_linux", installFinishedLinux = "install_finished_linux", installMediaFailedLinux = "install_media_failed_linux", installFailedLinux = "install_failed_linux"
+        case unexpectedQuit = "unexpected_quit"
+
+        var isInstall: Bool { rawValue.hasPrefix("install_started") || rawValue.hasPrefix("install_finished") || rawValue.contains("_failed_") }
+    }
+
+    private static let notesLock = NSLock()
+
+    /// From any thread. One more of this, since the last message.
+    static func note(_ note: Note, in defaults: UserDefaults = .standard) {
+        notesLock.lock(); defer { notesLock.unlock() }
+        var notes = defaults.dictionary(forKey: notesKey) as? [String: Int] ?? [:]
+        notes[note.rawValue] = min(999, (notes[note.rawValue] ?? 0) + 1)
+        defaults.set(notes, forKey: notesKey)
+    }
+
+    static func notes(in defaults: UserDefaults = .standard) -> [String: Int] {
+        notesLock.lock(); defer { notesLock.unlock() }
+        return defaults.dictionary(forKey: notesKey) as? [String: Int] ?? [:]
+    }
+
+    /// Once a message carrying `sent` has arrived: those are taken off, and
+    /// what was noted while it travelled stays for the next.
+    static func forget(_ sent: [String: Int], in defaults: UserDefaults = .standard) {
+        notesLock.lock(); defer { notesLock.unlock() }
+        var notes = defaults.dictionary(forKey: notesKey) as? [String: Int] ?? [:]
+        for (name, count) in sent {
+            let left = (notes[name] ?? 0) - count
+            notes[name] = left > 0 ? left : nil
+        }
+        defaults.set(notes, forKey: notesKey)
+    }
+
+    /// How long this copy has been in use, in four rough bands.
+    static func age(firstDay: String?, now: Date, zone: TimeZone = .current) -> String {
+        guard let firstDay, let first = date(fromDay: firstDay, in: zone) else { return "week" }
+        let days = Int(now.timeIntervalSince(first) / 86_400)
+        return days < 7 ? "week" : days < 30 ? "month" : days < 90 ? "quarter" : "older"
+    }
+
+    /// The fuller message's part, from what was noted. Unknown names are left out.
+    struct Detail: Equatable, Sendable {
+        var used: [String]
+        var installs: [String: Int]
+        var unexpectedQuits: Int
+        var readers: [String]
+        var age: String
+    }
+
+    static func detail(notes: [String: Int], readers: [String], age: String) -> Detail {
+        let known = notes.filter { Note(rawValue: $0.key) != nil && $0.value > 0 }
+        return Detail(used: known.keys.filter { !(Note(rawValue: $0)!.isInstall) && $0 != Note.unexpectedQuit.rawValue }.sorted(),
+                      installs: known.filter { Note(rawValue: $0.key)!.isInstall },
+                      unexpectedQuits: known[Note.unexpectedQuit.rawValue] ?? 0,
+                      readers: Array(Set(readers.map { $0.lowercased() }.filter { ["nvda", "jaws", "orca"].contains($0) })).sorted(),
+                      age: age)
+    }
     static let address = "https://fullcircleat.com/app/ping/"
 
     struct Message: Equatable, Sendable {
@@ -557,6 +639,8 @@ nonisolated enum UsageCounts {
         var windows: Int
         var linux: Int
         var macOSMachines: Int
+        /// Only with a yes to the fuller message.
+        var detail: Detail? = nil
     }
 
     /// Weeks from Monday, as the website counts them.
@@ -605,17 +689,33 @@ nonisolated enum UsageCounts {
             "first_ever": message.firstEver, "first_this_week": message.firstThisWeek, "first_this_month": message.firstThisMonth,
             "machines": ["windows": message.windows, "linux": message.linux, "macos": message.macOSMachines],
         ]
-        return (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data()
+        var all = object
+        if let detail = message.detail {
+            all["used"] = detail.used
+            all["installs"] = detail.installs
+            all["unexpected_quits"] = detail.unexpectedQuits
+            all["readers"] = detail.readers
+            all["age"] = detail.age
+        }
+        return (try? JSONSerialization.data(withJSONObject: all, options: [.sortedKeys])) ?? Data()
     }
 
     /// For Settings, before any is sent: what it holds today.
     static func summary(_ message: Message) -> String {
-        "Guest House \(message.version), macOS \(message.macOS), language \(message.language), \(message.windows) Windows, \(message.linux) Linux and \(message.macOSMachines) macOS machines, and whether it is this copy's first message ever, this week and this month"
+        "Guest House \(message.version), macOS \(message.macOS), language \(message.language), \(message.windows) Windows, \(message.linux) Linux and \(message.macOSMachines) macOS machines, and whether it is this copy's first message ever, this week and this month" + detailWords(message.detail)
+    }
+
+    /// The fuller message's part, in words.
+    static func detailWords(_ detail: Detail?) -> String {
+        guard let detail else { return "" }
+        func list(_ names: [String]) -> String { names.isEmpty ? "none" : names.map { $0.replacingOccurrences(of: "_", with: " ") }.joined(separator: ", ") }
+        let installs = detail.installs.sorted { $0.key < $1.key }.map { "\($0.key.replacingOccurrences(of: "_", with: " ")) \($0.value)" }
+        return "; features used since the last message: \(list(detail.used)); installs: \(installs.isEmpty ? "none" : installs.joined(separator: ", ")); unexpected quits: \(detail.unexpectedQuits); screen readers set up: \(list(detail.readers)); in use for: \(detail.age == "week" ? "under a week" : detail.age == "month" ? "under a month" : detail.age == "quarter" ? "under three months" : "three months or more")"
     }
 
     /// The same, in words, for the log.
     static func words(_ message: Message) -> String {
-        "Guest House \(message.version), macOS \(message.macOS), language \(message.language), \(message.windows) Windows, \(message.linux) Linux and \(message.macOSMachines) macOS machines; first ever: \(message.firstEver ? "yes" : "no"), first this week: \(message.firstThisWeek ? "yes" : "no"), first this month: \(message.firstThisMonth ? "yes" : "no")"
+        "Guest House \(message.version), macOS \(message.macOS), language \(message.language), \(message.windows) Windows, \(message.linux) Linux and \(message.macOSMachines) macOS machines; first ever: \(message.firstEver ? "yes" : "no"), first this week: \(message.firstThisWeek ? "yes" : "no"), first this month: \(message.firstThisMonth ? "yes" : "no")" + detailWords(message.detail)
     }
 }
 // /fork-only

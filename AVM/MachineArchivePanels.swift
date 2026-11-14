@@ -62,6 +62,7 @@ final class MachineArchiveController: ObservableObject {
     // MARK: - Export
 
     func export(_ config: VMConfiguration, isRunning: Bool) {
+        UsageCounts.note(.exportImport)   // fork-only-line
         let name = config.name
         if let activity {
             refuse("Guest House is already \(activity). Next: try again when it's done.", log: "another copy is running")
@@ -363,6 +364,7 @@ final class MachineArchiveController: ObservableObject {
     // MARK: - Import
 
     func importMachine(into store: VMStore) {
+        UsageCounts.note(.exportImport)   // fork-only-line
         if let activity {
             refuse("Guest House is already \(activity). Next: try again when it's done.", log: "another copy is running")
             return

@@ -60,6 +60,7 @@ final class InstallApps: ObservableObject {
     @discardableResult
     func install(_ apps: [OfferedApp], in machine: VMManager) async -> [OfferedApp] {
         guard current == nil else { return [] }
+        UsageCounts.note(.installApps)   // fork-only-line
         let name = machine.machineName
         stopAfterThis = false
         remaining = apps.count

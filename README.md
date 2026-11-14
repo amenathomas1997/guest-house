@@ -702,9 +702,15 @@ anonymous counts with Full Circle AT, and shares nothing until you say
 yes. With a yes, it sends one small message a day to fullcircleat.com:
 its version, your macOS version, your language, how many Windows, Linux
 and macOS machines you have, and whether this is its first message ever,
-this week and this month. That is all. There is no name, no install
-number, no machine names, nothing you type and no files, and the website
-keeps daily totals only, not your internet address. Every message is
+this week and this month. A second yes, asked for separately, adds:
+which features were used since the last message, by fixed names only
+(a shared folder, Save, Install Apps and so on); whether installs of
+Windows or Linux started, finished or failed; which screen readers your
+machines were set up with; whether Guest House closed unexpectedly; and
+roughly how long you have used it, in four bands. That is all. There is
+no name, no install number, no machine names, nothing you type and no
+files, and the website keeps daily totals only, not your internet
+address. Every message is
 written to the diagnostic log, and the switch is in Guest House's
 Settings, under General. The code is `UsageCounts` in
 [AVM/GuestWatchLogic.swift](AVM/GuestWatchLogic.swift) and

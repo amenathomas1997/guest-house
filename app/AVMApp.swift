@@ -834,6 +834,8 @@ final class AVMAppDelegate: NSObject, NSApplicationDelegate {
             // fork-only
             // Anonymous usage counts, only with the person's yes (2026-11-14,
             // UsageCountsSender.swift). After the machine list has loaded.
+            // First, whether the last run ended in good order.
+            if !testRun, CommandLine.arguments.count == 1 { UsageCountsSender.noteLaunch() }
             if !testRun {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 12) { UsageCountsSender.start() }
             }
@@ -916,6 +918,7 @@ final class AVMAppDelegate: NSObject, NSApplicationDelegate {
             // header above left for it.
             FocusLockManager.shared?.cleanup()
             Announcer.shared.waitUntilQuiet(seconds: 8)
+            UsageCountsSender.noteQuit()   // fork-only-line
         }
         // An update is being installed: this Guest House's helper exits now, after
         // the machines have given their devices back, so the new Guest House starts

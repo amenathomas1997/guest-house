@@ -76,6 +76,7 @@ final class BluetoothDevices: ObservableObject {
 
     @discardableResult
     func attach(_ device: BluetoothDeviceInfo, to machine: VMManager) async -> Bool {
+        UsageCounts.note(.bluetoothDevice)   // fork-only-line
         // Not into a machine being saved (2026-10-29, sixth audit): its save
         // gives its devices back first, and one sent meanwhile went into a
         // saved state that couldn't carry on.

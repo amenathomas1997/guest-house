@@ -364,6 +364,7 @@ final class USBRedirectController: ObservableObject {
     /// if nil.
     @discardableResult
     func attach(_ device: AVMUSBDeviceIdentity, to machine: VMManager? = nil, quiet: Bool = false) async -> Bool {
+        UsageCounts.note(.usbDevice)   // fork-only-line
         // Not into a machine being saved (2026-10-29, sixth audit): its save
         // has listed the devices to give back already, and one sent now went
         // into a saved state that couldn't carry on.
