@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.50</title>
+            <sparkle:version>70</sparkle:version>
+            <sparkle:shortVersionString>0.4.50</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>Guest House will ask you one question: whether to share anonymous usage counts with Full Circle AT. Nothing is shared unless you choose Share Anonymous Counts. It helps me know how many people use Guest House and which systems they run, so I know what to work on.</li><li>If you say yes, Guest House sends one small message a day with only this: its version, your macOS version, your language, how many Windows, Linux and macOS machines you have, and whether it is this copy&#x27;s first message ever, this week and this month. It never sends your name, an install number, your machines&#x27; names, anything you type, or any files, and the website keeps daily totals only, not your internet address.</li><li>You can change your answer any time in Guest House&#x27;s Settings, under General, where it also shows what today&#x27;s message would hold. Every message that is sent is written to the diagnostic log.</li></ul>]]></description>
+            <pubDate>Sat, 14 Nov 2026 22:38:26 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.50/GuestHouse-0.4.50.zip" sparkle:edSignature="VKJZaPM1lEL3rmSqViS+gvDmdfvy4uoA/d2eDBnhODcX5LYEUqWj9X+sPItA3b60APAr8WB/Y85viO9LyQ0LCw==" length="106749293" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.49</title>
             <sparkle:version>69</sparkle:version>
             <sparkle:shortVersionString>0.4.49</sparkle:shortVersionString>
