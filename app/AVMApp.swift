@@ -85,6 +85,7 @@ struct AVMApp: App {
         KeyboardTestJob.serveFolderIfAsked()
         SaveResumeTestJob.runIfAsked()
         // fork-only
+        UsageCountsSender.runTestIfAsked()
         // Machines and settings from when this was AVM (2026-11-12,
         // FromAVM.swift), before the list, the log or the updater exist.
         FromAVM.carryOver()
@@ -830,6 +831,13 @@ final class AVMAppDelegate: NSObject, NSApplicationDelegate {
             // What's New, once after an update (2026-10-30, AVMUpdater.swift).
             if !testRun { ReleaseNotes.showIfUpdated() }
             if !testRun { MachineBackups.shared.start() }
+            // fork-only
+            // Anonymous usage counts, only with the person's yes (2026-11-14,
+            // UsageCountsSender.swift). After the machine list has loaded.
+            if !testRun {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 12) { UsageCountsSender.start() }
+            }
+            // /fork-only
             if !testRun {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                     for config in VMStore.shared?.configurations ?? [] where config.guestOS != .macOS && VMManager.hasOrphanedQEMU(config.id) {

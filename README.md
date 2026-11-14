@@ -696,6 +696,23 @@ records your username — paths are sanitized at the point of writing.
 These are design commitments, and this repository is where you can
 verify them.
 
+<!-- fork-only -->
+**Anonymous usage counts.** Guest House asks once whether it may share
+anonymous counts with Full Circle AT, and shares nothing until you say
+yes. With a yes, it sends one small message a day to fullcircleat.com:
+its version, your macOS version, your language, how many Windows, Linux
+and macOS machines you have, and whether this is its first message ever,
+this week and this month. That is all. There is no name, no install
+number, no machine names, nothing you type and no files, and the website
+keeps daily totals only, not your internet address. Every message is
+written to the diagnostic log, and the switch is in Guest House's
+Settings, under General. The code is `UsageCounts` in
+[AVM/GuestWatchLogic.swift](AVM/GuestWatchLogic.swift) and
+[AVM/UsageCountsSender.swift](AVM/UsageCountsSender.swift); the website's
+side is public too, in `lib/appstats.php` of its repository.
+`Tools/usage-report.sh` prints GitHub's download and visitor numbers.
+<!-- /fork-only -->
+
 ## License
 
 GPL v2. See [LICENSE](LICENSE), and Licenses and source code above for

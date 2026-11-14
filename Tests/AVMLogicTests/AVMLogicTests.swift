@@ -2007,6 +2007,54 @@ final class GuestWatchTests: XCTestCase {
         XCTAssertTrue(WindowsApp.all.first { $0.name == "GitHub CLI" }!.isListed(in: ["GitHub CLI"]))
     }
 
+    // fork-only
+    /// Anonymous usage counts (2026-11-14): one message a day, and the
+    /// first-this-week and first-this-month answers the website counts by.
+    func testUsageCountsMessage() throws {
+        let zone = TimeZone(identifier: "America/Chicago")!
+        var calendar = Calendar(identifier: .iso8601); calendar.timeZone = zone
+        func at(_ y: Int, _ m: Int, _ d: Int, _ h: Int = 10) -> Date { calendar.date(from: DateComponents(year: y, month: m, day: d, hour: h))! }
+        func message(_ last: String?, _ now: Date) -> UsageCounts.Message? {
+            UsageCounts.message(lastSent: last, now: now, zone: zone, version: "0.4.50", macOS: "27.3", language: "es-MX", windows: 2, linux: 1, macOSMachines: 0)
+        }
+        // Saturday 14 November 2026. Never sent: everything is a first.
+        let first = try XCTUnwrap(message(nil, at(2026, 11, 14)))
+        XCTAssertTrue(first.firstEver && first.firstThisWeek && first.firstThisMonth)
+        XCTAssertEqual(first.language, "es")
+        // Already sent today: nothing, even late in the evening.
+        XCTAssertNil(message("2026-11-14", at(2026, 11, 14, 23)))
+        // The next day, Sunday, is the same week and month.
+        let sunday = try XCTUnwrap(message("2026-11-14", at(2026, 11, 15)))
+        XCTAssertFalse(sunday.firstEver || sunday.firstThisWeek || sunday.firstThisMonth)
+        // Monday starts a week; the month is the same.
+        let monday = try XCTUnwrap(message("2026-11-15", at(2026, 11, 16)))
+        XCTAssertTrue(monday.firstThisWeek)
+        XCTAssertFalse(monday.firstThisMonth || monday.firstEver)
+        // 1 December 2026 is a Tuesday: a new month inside a week already counted.
+        let december = try XCTUnwrap(message("2026-11-30", at(2026, 12, 1)))
+        XCTAssertTrue(december.firstThisMonth)
+        XCTAssertFalse(december.firstThisWeek)
+        // The week that spans the new year is one week, two months.
+        let newYear = try XCTUnwrap(message("2026-12-31", at(2027, 1, 1)))
+        XCTAssertFalse(newYear.firstThisWeek)
+        XCTAssertTrue(newYear.firstThisMonth)
+        // Away for three weeks, then back: both firsts, not the first ever.
+        let back = try XCTUnwrap(message("2026-10-20", at(2026, 11, 14)))
+        XCTAssertTrue(back.firstThisWeek && back.firstThisMonth)
+        XCTAssertFalse(back.firstEver)
+        // A last day that can't be read, or is in the future, isn't trusted.
+        XCTAssertEqual(message("nonsense", at(2026, 11, 14))?.firstThisWeek, true)
+        XCTAssertEqual(message("2030-01-01", at(2026, 11, 14))?.firstThisMonth, true)
+        XCTAssertEqual(message("nonsense", at(2026, 11, 14))?.firstEver, false)
+        // Exactly these keys leave the Mac, and no others.
+        let sent = try XCTUnwrap(JSONSerialization.jsonObject(with: UsageCounts.body(first)) as? [String: Any])
+        XCTAssertEqual(Set(sent.keys), ["version", "macos", "language", "first_ever", "first_this_week", "first_this_month", "machines"])
+        XCTAssertEqual(sent["machines"] as? [String: Int], ["windows": 2, "linux": 1, "macos": 0])
+        XCTAssertEqual(UsageCounts.day(at(2026, 11, 1, 0), in: zone), "2026-11-01")
+        XCTAssertTrue(UsageCounts.address.hasPrefix("https://"))
+    }
+    // /fork-only
+
     /// What a Linux machine says about the list (2026-11-14): only what its
     /// sources have is offered, in the list's order, and what's there is marked.
     func testLinuxAppsOfferedAndPresent() {

@@ -75,6 +75,9 @@ struct AppPreferencesView: View {
     @AppStorage(GuestWatchSettings.holdWhileInMachineKey) private var holdWhileInMachine = true
     @AppStorage(GuestWatchSettings.useSavedSetupKey) private var useSavedSetup = false
     @AppStorage(UpdateChannels.earlyKey) private var earlyUpdates = false
+    // fork-only
+    @AppStorage(UsageCounts.choiceKey) private var usageCountsChoice = ""
+    // /fork-only
     @AppStorage(ClaudeDescribe.enabledKey) private var describeWithClaude = false
     @State private var claudeKeyText = ""
 
@@ -127,6 +130,21 @@ struct AppPreferencesView: View {
                 Button("What's New") { ReleaseNotes.showRecent() }
                     .accessibilityHint("Shows what changed in this version of Guest House and the two before it")
             }
+            // fork-only
+            // Anonymous usage counts (2026-11-14, UsageCountsSender.swift).
+            Toggle("Share anonymous usage counts with Full Circle AT", isOn: Binding(
+                get: { usageCountsChoice == "yes" },
+                set: { UsageCountsSender.set($0) }))
+                .accessibilityHint("Once a day, tells Full Circle AT that a copy of Guest House is in use, with no name or install number")
+            Text("With this on, Guest House sends one small message a day, so I know how many people use it and what they run. It holds only what follows, and never your name, an install number, your machines' names, anything you type, or any files. Every message is also written to the diagnostic log.")
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+            if let example = UsageCountsSender.todaysMessage(ignoringLast: true) {
+                Text("What it would send today: \(UsageCounts.summary(example)).")
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            // /fork-only
             Text("Each virtual machine's own settings, such as its memory, devices and shared folder, are in its Settings: select it in the list and press Command-Option-Comma.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)

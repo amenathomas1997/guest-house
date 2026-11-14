@@ -1493,6 +1493,25 @@ Setup Assistant is up. macOS keeps VoiceOver on afterwards.
 
 ## 18. The diagnostic log, your privacy, and reporting a problem
 
+<!-- fork-only -->
+### Anonymous usage counts
+
+The first time you use Guest House after it gains this, it asks one
+question: **Share anonymous usage counts with Full Circle AT?** Nothing is
+shared unless you choose Share Anonymous Counts. You can change your answer
+any time in Guest House's Settings (Command-Comma), under General, with
+**Share anonymous usage counts with Full Circle AT**.
+
+With it on, Guest House sends one small message a day, and only this: its
+version, your macOS version, your language, how many Windows, Linux and
+macOS machines you have, and whether it is this copy's first message ever,
+this week and this month. It never sends your name, an install number,
+your machines' names, anything you type, or any files, and the website
+keeps daily totals only, not your internet address. Settings shows what
+today's message would hold, and every message sent is written to the
+diagnostic log in full.
+
+<!-- /fork-only -->
 ### What Guest House records, and what it never records
 
 Guest House keeps a diagnostic log of what *Guest House* did: machines starting and

@@ -153,9 +153,12 @@ for mine in com.fullcircleat.AVM com.fullcircleat.GuestHouse; do
     fi
 done
 # What brings an AVM copy's machines across to Guest House: not hers.
-if [ -f AVM/FromAVM.swift ]; then
-    git rm -q --cached AVM/FromAVM.swift && rm -f AVM/FromAVM.swift
-fi
+# Nor the anonymous usage counts, which go to this fork's own website.
+for mine in AVM/FromAVM.swift AVM/UsageCountsSender.swift; do
+    if [ -f "$mine" ]; then
+        git rm -q --cached "$mine" && rm -f "$mine"
+    fi
+done
 # (Nothing to change, as in a tree that already has her identity, is fine.)
 # Fork-only Swift and shell first: the blocks name this fork's old identifier.
 { git grep -lzI -e "# fork-only" -- 'Tools/*.sh' || true; } | xargs -0 perl -0pi -e 's{^[ \t]*# fork-only\n.*?^[ \t]*# /fork-only\n}{}gms'

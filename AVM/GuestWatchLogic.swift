@@ -529,3 +529,93 @@ nonisolated enum Stalls {
     }
 }
 
+
+// fork-only
+/// Anonymous usage counts (2026-11-14, the user's request): how many copies
+/// of Guest House are in use, with no name, address or install number, and
+/// only when the person has said yes. Once a day at most, a copy sends its
+/// version, the macOS version, its language, how many machines of each kind
+/// it has, and three answers it works out here from the day it last sent:
+/// is this its first message ever, its first this week, its first this
+/// month. Those are what let the website count copies a day, a week and a
+/// month without anything that links one day's message to the next.
+/// The sending is in UsageCountsSender.swift; this is what the tests reach.
+nonisolated enum UsageCounts {
+    /// "yes" or "no"; not there until the person has answered.
+    static let choiceKey = "UsageCountsChoice"
+    /// The day of the last message that arrived, as yyyy-MM-dd.
+    static let lastSentKey = "UsageCountsLastSent"
+    static let address = "https://fullcircleat.com/app/ping/"
+
+    struct Message: Equatable, Sendable {
+        var version: String
+        var macOS: String
+        var language: String
+        var firstEver: Bool
+        var firstThisWeek: Bool
+        var firstThisMonth: Bool
+        var windows: Int
+        var linux: Int
+        var macOSMachines: Int
+    }
+
+    /// Weeks from Monday, as the website counts them.
+    private static var weeks: Calendar { Calendar(identifier: .iso8601) }
+
+    static func day(_ date: Date, in zone: TimeZone = .current) -> String {
+        var calendar = weeks
+        calendar.timeZone = zone
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    private static func date(fromDay day: String, in zone: TimeZone) -> Date? {
+        let numbers = day.split(separator: "-").compactMap { Int($0) }
+        guard numbers.count == 3 else { return nil }
+        var calendar = weeks
+        calendar.timeZone = zone
+        return calendar.date(from: DateComponents(year: numbers[0], month: numbers[1], day: numbers[2], hour: 12))
+    }
+
+    /// Today's message, or nil when one already went today. A last day that
+    /// can't be read, or is after today (the clock was changed), counts as
+    /// never having sent, except that it isn't called the first ever.
+    static func message(lastSent: String?, now: Date, zone: TimeZone = .current, version: String, macOS: String, language: String,
+                        windows: Int, linux: Int, macOSMachines: Int) -> Message? {
+        let today = day(now, in: zone)
+        if lastSent == today { return nil }
+        var calendar = weeks
+        calendar.timeZone = zone
+        let last = lastSent.flatMap { date(fromDay: $0, in: zone) }.flatMap { $0 <= now.addingTimeInterval(86_400) ? $0 : nil }
+        func same(_ parts: Set<Calendar.Component>) -> Bool {
+            guard let last else { return false }
+            return calendar.dateComponents(parts, from: last) == calendar.dateComponents(parts, from: now)
+        }
+        return Message(version: version, macOS: macOS, language: String(language.lowercased().prefix(2)),
+                       firstEver: lastSent == nil,
+                       firstThisWeek: !same([.yearForWeekOfYear, .weekOfYear]),
+                       firstThisMonth: !same([.year, .month]),
+                       windows: max(0, windows), linux: max(0, linux), macOSMachines: max(0, macOSMachines))
+    }
+
+    /// Exactly what is sent: nothing else leaves the Mac.
+    static func body(_ message: Message) -> Data {
+        let object: [String: Any] = [
+            "version": message.version, "macos": message.macOS, "language": message.language,
+            "first_ever": message.firstEver, "first_this_week": message.firstThisWeek, "first_this_month": message.firstThisMonth,
+            "machines": ["windows": message.windows, "linux": message.linux, "macos": message.macOSMachines],
+        ]
+        return (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data()
+    }
+
+    /// For Settings, before any is sent: what it holds today.
+    static func summary(_ message: Message) -> String {
+        "Guest House \(message.version), macOS \(message.macOS), language \(message.language), \(message.windows) Windows, \(message.linux) Linux and \(message.macOSMachines) macOS machines, and whether it is this copy's first message ever, this week and this month"
+    }
+
+    /// The same, in words, for the log.
+    static func words(_ message: Message) -> String {
+        "Guest House \(message.version), macOS \(message.macOS), language \(message.language), \(message.windows) Windows, \(message.linux) Linux and \(message.macOSMachines) macOS machines; first ever: \(message.firstEver ? "yes" : "no"), first this week: \(message.firstThisWeek ? "yes" : "no"), first this month: \(message.firstThisMonth ? "yes" : "no")"
+    }
+}
+// /fork-only
