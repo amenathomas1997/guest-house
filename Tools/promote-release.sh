@@ -10,7 +10,7 @@
 # On main, level with GitHub, as publish-release.sh is.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_SLUG="${AVM_REPO:-amenathomas1997/accessible-virtual-machine}"
+REPO_SLUG="${AVM_REPO:-amenathomas1997/guest-house}"
 VERSION="${1:-}"
 [ -n "$VERSION" ] || { echo "Usage: $0 <version>"; exit 64; }
 [ "$(git -C "$REPO_ROOT" branch --show-current)" = main ] || { echo "FAILED: this checkout isn't on main."; exit 1; }

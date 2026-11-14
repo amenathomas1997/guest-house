@@ -20,7 +20,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_SLUG="${AVM_REPO:-amenathomas1997/accessible-virtual-machine}"
+REPO_SLUG="${AVM_REPO:-amenathomas1997/guest-house}"
 # The branch whose appcast.xml installed copies read (SUFeedURL in
 # AVM/Info.plist). The release is tagged there and the feed entry is
 # pushed there; publishing from any other branch would offer nobody the

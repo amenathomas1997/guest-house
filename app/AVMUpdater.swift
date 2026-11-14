@@ -260,6 +260,11 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.49", changes: [
+            "A shared folder no longer needs a restart. Choose a folder in a machine's Settings and press Save, and a machine that is running gets it straight away; Guest House says so. Before, Windows showed \"This folder is empty\" until it had been shut down and started again. If File Explorer still shows the old contents, press F5.",
+            "Install Apps, in the Virtual Machine menu, now works in Linux machines too. It lists the apps your Linux system's own software sources have, up to 17 of them, such as Firefox, Thunderbird, LibreOffice, VLC, Audacity, calibre and KeePassXC, and installs the ones you tick with no questions. This was tested in Debian; in Ubuntu, Fedora and the others it uses the same steps with that system's own package manager.",
+            "Guest House's project on GitHub has a new address: github.com/amenathomas1997/guest-house. Help, then Report a Problem, and the README link in the Help menu go there. Old links still work.",
+        ]),
         ReleaseNote(version: "0.4.48", changes: [
             "Install Apps, in the Virtual Machine menu, now offers 39 Windows apps instead of 12. New ones include the Brave and Vivaldi browsers, REAPER and GoldWave for recording, foobar2000, Winamp and iTunes for music, calibre, SumatraPDF and Foxit PDF Reader for reading, Dropbox, Google Drive, KeePassXC and Bitwarden, TeamViewer, PuTTY and Tailscale, and Node.js, Go, GitHub CLI and AutoHotkey for developers. Every one was installed in Windows before it went on the list.",
             "The list is now under headings, such as Web browsers, Music and video, and Files and passwords. With VoiceOver, VO-Command-H moves from one heading to the next.",

@@ -3,7 +3,7 @@ Guest House: third-party notices
 
 Guest House is free software under the GNU General Public License, version 2
 (the LICENSE file at the root of its repository,
-https://github.com/amenathomas1997/accessible-virtual-machine). So that
+https://github.com/amenathomas1997/guest-house). So that
 it runs with nothing else installed, it bundles the programs, libraries,
 drivers and installers below, built or copied from the sources named
 here. Each keeps its own licence. The licence texts are in this folder,

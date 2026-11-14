@@ -265,3 +265,129 @@ nonisolated enum WindowsAppManifest {
         Data(script.utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] }).base64EncodedString()
     }
 }
+
+// MARK: - Linux (2026-11-14)
+
+/// An app Install Apps offers a Linux machine. Each comes from the
+/// system's own software sources, through its own package manager (apt,
+/// dnf or zypper), as root through the guest agent, with no questions.
+/// A system doesn't have every one: an app whose package the machine's
+/// sources don't know isn't offered there.
+nonisolated struct LinuxApp: Sendable, Hashable, Identifiable {
+    let name: String
+    let what: String
+    let group: String
+    /// Package names to try in order, for each package manager.
+    let apt: [String]
+    let dnf: [String]
+    let zypper: [String]
+    var id: String { name }
+
+    init(_ name: String, _ what: String, _ group: String, apt: [String], dnf: [String]? = nil, zypper: [String]? = nil) {
+        self.name = name; self.what = what; self.group = group
+        self.apt = apt; self.dnf = dnf ?? apt; self.zypper = zypper ?? dnf ?? apt
+    }
+
+    static let all: [LinuxApp] = [
+        LinuxApp("Firefox", "Web browser", "Web browsers", apt: ["firefox-esr", "firefox"], dnf: ["firefox"], zypper: ["MozillaFirefox"]),
+        LinuxApp("Chromium", "Web browser", "Web browsers", apt: ["chromium", "chromium-browser"], dnf: ["chromium"]),
+        LinuxApp("Thunderbird", "Email", "Email, documents and notes", apt: ["thunderbird"], zypper: ["MozillaThunderbird"]),
+        LinuxApp("LibreOffice", "Documents and spreadsheets", "Email, documents and notes", apt: ["libreoffice"]),
+        LinuxApp("Pandoc", "Document converter", "Email, documents and notes", apt: ["pandoc"]),
+        LinuxApp("Mumble", "Voice chat", "Meetings and voice chat", apt: ["mumble"]),
+        LinuxApp("VLC", "Audio and video player", "Music and video", apt: ["vlc"]),
+        LinuxApp("Audacious", "Music player", "Music and video", apt: ["audacious"]),
+        LinuxApp("Audacity", "Audio editor", "Recording and audio editing", apt: ["audacity"]),
+        LinuxApp("calibre", "E-book library", "Reading", apt: ["calibre"]),
+        LinuxApp("7-Zip", "Compressed files", "Files and passwords", apt: ["7zip", "p7zip-full"], dnf: ["7zip", "p7zip"], zypper: ["7zip", "p7zip-full"]),
+        LinuxApp("KeePassXC", "Password manager", "Files and passwords", apt: ["keepassxc"]),
+        LinuxApp("Remmina", "Remote desktop", "Remote access and networks", apt: ["remmina"]),
+        LinuxApp("PuTTY", "Remote terminal", "Remote access and networks", apt: ["putty"]),
+        LinuxApp("Git", "Version control", "For developers", apt: ["git"]),
+        LinuxApp("Node.js", "JavaScript runtime", "For developers", apt: ["nodejs"]),
+        LinuxApp("Go", "Programming language", "For developers", apt: ["golang"], dnf: ["golang"], zypper: ["go"]),
+    ]
+
+    private static let preamble = """
+    if command -v apt-get >/dev/null 2>&1; then F=apt; elif command -v dnf >/dev/null 2>&1; then F=dnf; elif command -v zypper >/dev/null 2>&1; then F=zypper; else F=none; fi
+    has() { case $F in apt) [ "$(dpkg-query -W -f='${db:Status-Status}' "$1" 2>/dev/null)" = installed ];; *) rpm -q "$1" >/dev/null 2>&1;; esac; }
+    known() { case $F in apt) apt-cache show "$1" >/dev/null 2>&1;; dnf) [ -n "$(dnf -q repoquery --qf '%{name}' "$1" 2>/dev/null | head -1)" ];; zypper) zypper -q --non-interactive search -x "$1" >/dev/null 2>&1;; *) false;; esac; }
+    """
+
+    private static func words(_ names: [String]) -> String {
+        names.filter { $0.allSatisfy { $0.isLetter || $0.isNumber || "+-._".contains($0) } }.joined(separator: " ")
+    }
+
+    /// One line a listed app: `AVM-APP has N`, `AVM-APP offers N` or
+    /// `AVM-APP none N`, N its place in `all`; first, `AVM-APPS apt`
+    /// (or dnf, zypper, none).
+    static var stateScript: String {
+        func lines(_ packages: KeyPath<LinuxApp, [String]>) -> String {
+            all.enumerated().map { "app \($0.offset) \(words($0.element[keyPath: packages]))" }.joined(separator: "; ")
+        }
+        return preamble + """
+
+        echo "AVM-APPS $F"
+        app() { k=$1; shift; s=none; for p in "$@"; do if has "$p"; then s=has; break; fi; done
+          if [ $s = none ]; then for p in "$@"; do if known "$p"; then s=offers; break; fi; done; fi; echo "AVM-APP $s $k"; }
+        case $F in apt) \(lines(\.apt));; dnf) \(lines(\.dnf));; zypper) \(lines(\.zypper));; esac
+        """
+    }
+
+    /// What `stateScript` printed: the apps this machine can have, in the
+    /// list's order, and those it has already. Nil when it isn't an answer.
+    static func state(from output: String) -> (offered: [LinuxApp], present: Set<LinuxApp>)? {
+        let lines = output.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+        guard lines.contains(where: { $0.hasPrefix("AVM-APPS ") }) else { return nil }
+        var offered: [LinuxApp] = []
+        var present = Set<LinuxApp>()
+        for line in lines where line.hasPrefix("AVM-APP ") {
+            let parts = line.split(separator: " ")
+            guard parts.count == 3, let index = Int(parts[2]), all.indices.contains(index), parts[1] != "none" else { continue }
+            offered.append(all[index])
+            if parts[1] == "has" { present.insert(all[index]) }
+        }
+        return (all.filter { offered.contains($0) }, present)
+    }
+
+    /// Installs it. Its last line is `AVM-INSTALL ok 0`, `AVM-INSTALL failed
+    /// CODE` or `AVM-INSTALL download` (no package for it here), as the
+    /// Windows script's is. apt's lists are refreshed once if the first
+    /// try fails, and it waits for another package job to finish.
+    var installScript: String {
+        Self.preamble + """
+
+        export DEBIAN_FRONTEND=noninteractive
+        case $F in apt) C="\(Self.words(apt))";; dnf) C="\(Self.words(dnf))";; zypper) C="\(Self.words(zypper))";; *) C="";; esac
+        pick() { P=""; for p in $C; do if known "$p"; then P=$p; break; fi; done; }
+        pick
+        if [ -z "$P" ] && [ $F = apt ]; then apt-get update -q >/dev/null 2>&1; pick; fi
+        if [ -z "$P" ]; then echo 'AVM-INSTALL download'; exit 0; fi
+        L=$(mktemp)
+        go() { case $F in apt) apt-get install -y -q -o DPkg::Lock::Timeout=600 "$P";; dnf) dnf install -y -q "$P";; zypper) zypper --non-interactive install "$P";; esac >"$L" 2>&1; }
+        go; c=$?
+        if [ $c != 0 ] && [ $F = apt ]; then apt-get update -q >/dev/null 2>&1; go; c=$?; fi
+        if [ $c = 0 ] && has "$P"; then echo 'AVM-INSTALL ok 0'; else tail -4 "$L"; echo "AVM-INSTALL failed $c"; fi
+        rm -f "$L"
+        """
+    }
+}
+
+/// One line of the Install Apps window: a Windows app or a Linux one.
+nonisolated struct OfferedApp: Sendable, Hashable, Identifiable {
+    enum Source: Sendable, Hashable { case windows(WindowsApp), linux(LinuxApp) }
+    let source: Source
+    var name: String { switch source { case .windows(let a): return a.name; case .linux(let a): return a.name } }
+    var what: String { switch source { case .windows(let a): return a.what; case .linux(let a): return a.what } }
+    var group: String { switch source { case .windows(let a): return a.group; case .linux(let a): return a.group } }
+    var id: String { switch source { case .windows(let a): return "windows " + a.id; case .linux(let a): return "linux " + a.id } }
+
+    /// Under their headings, in the order given.
+    static func grouped(_ apps: [OfferedApp]) -> [(group: String, apps: [OfferedApp])] {
+        var result: [(group: String, apps: [OfferedApp])] = []
+        for app in apps {
+            if let at = result.firstIndex(where: { $0.group == app.group }) { result[at].apps.append(app) } else { result.append((app.group, [app])) }
+        }
+        return result
+    }
+}

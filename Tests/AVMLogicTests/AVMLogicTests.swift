@@ -2007,6 +2007,37 @@ final class GuestWatchTests: XCTestCase {
         XCTAssertTrue(WindowsApp.all.first { $0.name == "GitHub CLI" }!.isListed(in: ["GitHub CLI"]))
     }
 
+    /// What a Linux machine says about the list (2026-11-14): only what its
+    /// sources have is offered, in the list's order, and what's there is marked.
+    func testLinuxAppsOfferedAndPresent() {
+        let firefox = LinuxApp.all.firstIndex { $0.name == "Firefox" }!
+        let vlc = LinuxApp.all.firstIndex { $0.name == "VLC" }!
+        let git = LinuxApp.all.firstIndex { $0.name == "Git" }!
+        let output = "AVM-APPS apt\nAVM-APP has \(git)\nAVM-APP none \(vlc)\nAVM-APP offers \(firefox)\nAVM-APP offers 999\nnoise\n"
+        let state = LinuxApp.state(from: output)
+        XCTAssertEqual(state?.offered.map(\.name), ["Firefox", "Git"])
+        XCTAssertEqual(state?.present.map(\.name), ["Git"])
+        XCTAssertNil(LinuxApp.state(from: "sh: not found"))
+        XCTAssertEqual(LinuxApp.state(from: "AVM-APPS none")?.offered.count, 0)
+        // Every package name is one a shell line can carry as it is.
+        for app in LinuxApp.all {
+            for name in app.apt + app.dnf + app.zypper {
+                XCTAssertTrue(name.allSatisfy { $0.isLetter || $0.isNumber || "+-._".contains($0) }, "\(app.name): \(name)")
+            }
+            XCTAssertFalse(app.apt.isEmpty || app.dnf.isEmpty || app.zypper.isEmpty)
+            XCTAssertTrue(app.installScript.contains("AVM-INSTALL ok 0"))
+        }
+        XCTAssertEqual(Set(LinuxApp.all.map(\.name)).count, LinuxApp.all.count)
+        XCTAssertTrue(LinuxApp.stateScript.contains("app \(firefox) firefox-esr firefox"))
+        // Its result reads as the Windows script's does.
+        XCTAssertEqual(WindowsAppManifest.outcome(of: "Setting up pandoc\nAVM-INSTALL ok 0\n"), .installed(restartNeeded: false))
+        XCTAssertEqual(WindowsAppManifest.outcome(of: "E: Unable to locate package\nAVM-INSTALL failed 100\n"), .failed(code: 100))
+        // Headings keep the list's order, each once.
+        let grouped = OfferedApp.grouped(LinuxApp.all.map { OfferedApp(source: .linux($0)) })
+        XCTAssertEqual(grouped.first?.group, "Web browsers")
+        XCTAssertEqual(Set(grouped.map(\.group)).count, grouped.count)
+    }
+
     /// Each heading once, every app under one, no app or package twice.
     func testWindowsAppsAreGroupedUnderHeadings() {
         let grouped = WindowsApp.grouped

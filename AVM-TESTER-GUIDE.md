@@ -10,7 +10,7 @@ the first people to run it anywhere else. Everything you notice is worth
 reporting, especially anything that happens silently.
 
 Guest House is free software under the GNU General Public License, version 2. The
-project lives at https://github.com/amenathomas1997/accessible-virtual-machine<!-- fork-only -->, a fork of Allison Meloy's
+project lives at https://github.com/amenathomas1997/guest-house<!-- fork-only -->, a fork of Allison Meloy's
 original at https://github.com/allisonfm85/accessible-virtual-machine<!-- /fork-only -->
 
 ---
@@ -581,7 +581,9 @@ of this is Guest House.
   add a **second drive**.
 
 - **Install Apps…**, in the Virtual Machine menu, installs apps you tick from a
-  list into a running Windows machine, one at a time with no questions.
+  list into a running Windows or Linux machine, one at a time with no
+  questions. In Linux they come from the system's own software sources, and
+  only the apps those sources have are listed.
 
 These work with your keyboard on the Mac or in the machine: Command-Shift-O,
 Command-Option-Shift-O, Command-Shift-I, Command-Option-Shift-I,
@@ -832,9 +834,10 @@ allow incoming connections to qemu-system-aarch64; allow it.
 ### Sharing a folder
 
 To open a Mac folder in Windows, open the machine's Settings and choose
-Choose Folder to Share. The next time Windows starts, the folder is a
-network drive in File Explorer. Turn on the read-only option if Windows
-should only read it.
+Choose Folder to Share, then Save. The folder is a network drive in File
+Explorer; if Windows is running, it gets the folder as soon as you save,
+with no restart (press F5 in File Explorer if it still shows the old
+contents). Turn on the read-only option if Windows should only read it.
 
 ### When the Mac sleeps
 
@@ -1531,7 +1534,7 @@ to save yet." That is information, not an error.
 
 File issues at:
 
-https://github.com/amenathomas1997/accessible-virtual-machine/issues
+https://github.com/amenathomas1997/guest-house/issues
 
 The most useful report is a plain story of what you heard and when. The
 issue form will prompt you for:

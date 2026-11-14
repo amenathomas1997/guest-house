@@ -693,7 +693,7 @@ struct AVMApp: App {
                 }
                 Button("Guest House README on GitHub") {
                     AVMLog.write("Guest House: Help menu — opening the README on GitHub.")
-                    if let url = URL(string: "https://github.com/amenathomas1997/accessible-virtual-machine#readme") {
+                    if let url = URL(string: "https://github.com/amenathomas1997/guest-house#readme") {
                         NSWorkspace.shared.open(url)
                     }
                 }

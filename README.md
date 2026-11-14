@@ -89,7 +89,10 @@ The **Virtual Machine** menu can also:
 - **Type Clipboard into Windows** (Command-Shift-V): types the clipboard's
   text as key presses, for a sign-in box or product key field that won't
   take a paste. It types a US keyboard's characters.
-- **Install Apps** (Virtual Machine menu, Windows): tick any of 39 apps, under
+- **Install Apps** (Virtual Machine menu, Windows and Linux): in Linux, tick
+  from up to 17 apps the system's own software sources have (Firefox,
+  Thunderbird, LibreOffice, VLC, Audacity and more), installed by its own
+  package manager. In Windows, tick any of 39 apps, under
   headings VoiceOver can move between: web browsers (Chrome, Firefox, Brave,
   Vivaldi), email, documents and notes, meetings and voice chat, music and
   video, recording and audio editing (Audacity, REAPER, GoldWave), reading,

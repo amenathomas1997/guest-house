@@ -130,7 +130,7 @@ enum SaveResumeTestJob {
     static let flag = "--test-save-resume"
 
     static func runIfAsked(arguments: [String] = CommandLine.arguments) {
-        guard arguments.contains(flag) || arguments.contains("--test-microphone") || arguments.contains("--test-two-machines") || arguments.contains("--test-stress") || arguments.contains("--test-blue-screen") || arguments.contains("--test-machine-drives") || arguments.contains("--test-install-apps")
+        guard arguments.contains(flag) || arguments.contains("--test-microphone") || arguments.contains("--test-two-machines") || arguments.contains("--test-stress") || arguments.contains("--test-blue-screen") || arguments.contains("--test-machine-drives") || arguments.contains("--test-install-apps") || arguments.contains("--test-keyboard-layout")
                 || arguments.contains("--test-duplicate") || arguments.contains("--test-send-file")
                 || arguments.contains("--test-linux-share") || arguments.contains("--test-ctl")
                 || arguments.contains("--test-disk-info") || arguments.contains("--run-in-guest")
@@ -204,8 +204,11 @@ enum SaveResumeTestJob {
         let guest = GuestOS(rawValue: value("--guest") ?? "windows") ?? .windows
         Task { @MainActor in
             let folderURL = URL(fileURLWithPath: folder, isDirectory: true)
+            if arguments.contains("--test-keyboard-layout") {
+                await finish(await keyboardLayout(folderURL, guest))
+            }
             if arguments.contains("--test-install-apps") {
-                await finish(await installApps(folderURL))
+                await finish(guest == .windows ? await installApps(folderURL) : await installLinuxApps(folderURL, guest))
             }
             if arguments.contains("--test-restore-undo") {
                 await finish(await restoreUndo(folderURL, guest))
@@ -1482,6 +1485,11 @@ enum SaveResumeTestJob {
         try? FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: shared) }
         try? "from the Mac\n".write(to: shared.appendingPathComponent("hello.txt"), atomically: true, encoding: .utf8)
+        // A second folder, changed to while the machine runs (2026-11-14).
+        let second = FileManager.default.temporaryDirectory.appendingPathComponent("avm-share-test-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: second, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: second) }
+        try? "from the second folder\n".write(to: second.appendingPathComponent("second.txt"), atomically: true, encoding: .utf8)
         let manager = VMManager()
         guard await start(manager, configuration(folder: folder, guest: guest)),
               let agent = manager.guestAgentSocketPath, await waitForAgent(agent, seconds: 300) else {
@@ -1489,7 +1497,9 @@ enum SaveResumeTestJob {
         }
         let server = Process()
         server.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
-        server.arguments = ["--serve-folder", shared.path, "--spice", manager.spiceSocketPath]
+        let changeAfter = 75.0
+        let served = Date()
+        server.arguments = ["--serve-folder", shared.path, "--spice", manager.spiceSocketPath, "--then-folder", second.path, "--after", "\(Int(changeAfter))"]
         server.standardOutput = FileHandle.nullDevice
         try? server.run()
         defer { server.terminate() }
@@ -1515,6 +1525,22 @@ enum SaveResumeTestJob {
         try? await Task.sleep(for: .seconds(2))
         check("a file written in the guest is on the Mac", (try? String(contentsOf: shared.appendingPathComponent("back.txt"), encoding: .utf8))?.contains("from the guest") == true)
         check("it's bookmarked in Files", out?.split(whereSeparator: \.isNewline).last == "1")
+        // The folder changed while the machine runs, with no restart.
+        let wait = changeAfter + 8 - Date().timeIntervalSince(served)
+        if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+        print("== After the folder is changed on the Mac, with the machine running")
+        let after = await exec(agent, program: "/bin/sh", args: ["-c", """
+            U=$(getent passwd 1000 | cut -d: -f1); UID_=1000
+            G="runuser -u $U -- env XDG_RUNTIME_DIR=/run/user/$UID_ DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$UID_/bus"
+            $G gio cat dav://localhost:9843/second.txt 2>&1
+            $G gio cat dav://localhost:9843/hello.txt >/dev/null 2>&1 && echo "old file still there" || echo "old file gone"
+            echo "into the second" | $G gio save dav://localhost:9843/back2.txt 2>&1 && echo "wrote back"
+            """])
+        print((after ?? "no answer").split(whereSeparator: \.isNewline).map { "   " + $0 }.joined(separator: "\n"))
+        check("the new folder's file reads in the guest, with no restart", after?.contains("from the second folder") == true)
+        check("the first folder's file is no longer offered", after?.contains("old file gone") == true)
+        try? await Task.sleep(for: .seconds(2))
+        check("a file written in the guest is in the new folder", (try? String(contentsOf: second.appendingPathComponent("back2.txt"), encoding: .utf8))?.contains("into the second") == true)
         await shutDown(manager)
         return ok
     }
@@ -1764,6 +1790,89 @@ enum SaveResumeTestJob {
         MachineDisplays.placeOpening(window, for: config)
         check("one that isn't connected leaves the window be", window.frame == before && MachineDisplays.chosenScreen(config) == nil)
         check("and isn't moved to when the monitors change", !MachineDisplays.displaysChanged(window, for: config))
+        return ok
+    }
+
+    /// --test-keyboard-layout (2026-11-14): the check Type Clipboard makes
+    /// before typing, never run in a machine since it was written
+    /// (2026-11-10 #10). The test machines are US: it says nothing there.
+    /// The machine's layout is then set to another, the check names it,
+    /// and the layout is put back.
+    private static func keyboardLayout(_ folder: URL, _ guest: GuestOS) async -> Bool {
+        let manager = VMManager()
+        guard await start(manager, configuration(folder: folder, guest: guest)),
+              let agent = manager.guestAgentSocketPath, await waitForAgent(agent, seconds: 300) else {
+            check("the machine started and answers", false); await shutDown(manager); return false
+        }
+        try? await Task.sleep(for: .seconds(20))
+        let first = await manager.keyboardLayoutIfNotUS()
+        print("   as installed: \(first ?? "US, or not told")")
+        check("a US machine is left alone", first == nil)
+        if guest == .windows {
+            // The sign-in screen's layout and the signed-in user's, to German, then back.
+            let set = { (code: String) in
+                _ = await exec(agent, program: "powershell.exe", args: ["-NoProfile", "-Command", """
+                    $u = (Get-CimInstance Win32_ComputerSystem).UserName; $keys = @('Registry::HKEY_USERS\\.DEFAULT')
+                    if ($u) { try { $keys += 'Registry::HKEY_USERS\\' + (New-Object Security.Principal.NTAccount($u)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { } }
+                    foreach ($k in $keys) { if (Test-Path "$k\\Keyboard Layout\\Preload") { Set-ItemProperty "$k\\Keyboard Layout\\Preload" -Name 1 -Value '\(code)' } }
+                    """])
+            }
+            await set("00000407")
+            let german = await manager.keyboardLayoutIfNotUS()
+            print("   set to German: \(german ?? "nothing")")
+            check("a German layout is named", german == "00000407")
+            await set("00000409")
+        } else {
+            // Debian keeps it in /etc/default/keyboard and refuses localectl's
+            // own setter; the others take the setter.
+            let set = { (layout: String, variant: String) in
+                _ = await exec(agent, program: "/bin/sh", args: ["-c", "if [ -f /etc/default/keyboard ]; then sed -i -e 's/^XKBLAYOUT=.*/XKBLAYOUT=\"\(layout)\"/' -e 's/^XKBVARIANT=.*/XKBVARIANT=\"\(variant)\"/' /etc/default/keyboard; else localectl set-x11-keymap \(layout) '' '\(variant)'; fi"])
+            }
+            await set("de", "")
+            let german = await manager.keyboardLayoutIfNotUS()
+            print("   set to German: \(german ?? "nothing")")
+            check("a German layout is named", german == "de")
+            await set("us", "dvorak")
+            let dvorak = await manager.keyboardLayoutIfNotUS()
+            print("   set to US Dvorak: \(dvorak ?? "nothing")")
+            check("a variant of US is named", dvorak == "us dvorak")
+            await set("us", "")
+        }
+        let back = await manager.keyboardLayoutIfNotUS()
+        check("and it is quiet again once the layout is put back", back == nil)
+        await shutDown(manager)
+        return ok
+    }
+
+    /// A Linux machine (2026-11-14): what its software sources offer, one
+    /// small app installed by its package manager and seen as installed,
+    /// then removed again. AVM_INSTALL_APPS=all installs every one offered.
+    private static func installLinuxApps(_ folder: URL, _ guest: GuestOS) async -> Bool {
+        let manager = VMManager()
+        guard await start(manager, configuration(folder: folder, guest: guest)),
+              let agent = manager.guestAgentSocketPath, await waitForAgent(agent, seconds: 300) else {
+            check("the machine started and answers", false); await shutDown(manager); return false
+        }
+        let state = await InstallApps.shared.offered(in: manager)
+        print("== Offered: \(state.apps.map(\.name).joined(separator: ", "))")
+        print("   already there: \((state.present ?? []).map(\.name).sorted().joined(separator: ", "))")
+        check("it says what its sources offer", state.present != nil && !state.apps.isEmpty)
+        let asked = ProcessInfo.processInfo.environment["AVM_INSTALL_APPS"] ?? "Pandoc"
+        let wanted = state.apps.filter { (asked == "all" || asked.contains($0.name)) && state.present?.contains($0) != true }
+        check("there is something to install", !wanted.isEmpty)
+        print("== Installing \(wanted.map(\.name).joined(separator: ", "))")
+        fflush(stdout)
+        let done = await InstallApps.shared.install(wanted, in: manager)
+        for app in wanted { check("\(app.name) installed", done.contains(app)) }
+        let after = await InstallApps.shared.offered(in: manager)
+        for app in wanted { check("\(app.name) is seen as installed afterwards", after.present?.contains(app) == true) }
+        // The test machine goes back as it was, for what this test put there.
+        if asked == "Pandoc", done.count == 1 {
+            _ = await exec(agent, program: "/bin/sh", args: ["-c", "export DEBIAN_FRONTEND=noninteractive; if command -v apt-get >/dev/null; then apt-get remove -y -q pandoc; apt-get autoremove -y -q; elif command -v dnf >/dev/null; then dnf remove -y -q pandoc; else zypper --non-interactive remove pandoc; fi"])
+            let back = await InstallApps.shared.offered(in: manager)
+            check("and is offered again once removed", back.present?.contains(where: { $0.name == "Pandoc" }) == false && back.apps.contains { $0.name == "Pandoc" })
+        }
+        await shutDown(manager)
         return ok
     }
 

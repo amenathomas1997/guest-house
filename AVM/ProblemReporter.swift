@@ -19,7 +19,7 @@ enum ProblemReporter {
     // The template named in the address (2026-10-29, seventh audit): with
     // templates in the repository, a bare issues/new is GitHub's chooser
     // page, one more step before the form.
-    static let newIssueURL = "https://github.com/amenathomas1997/accessible-virtual-machine/issues/new?template=report-a-problem.md"
+    static let newIssueURL = "https://github.com/amenathomas1997/guest-house/issues/new?template=report-a-problem.md"
     /// Lines from the end of the log; enough for the last start, short
     /// enough to read before submitting.
     static let logLines = 120

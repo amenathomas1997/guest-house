@@ -550,7 +550,7 @@ info "$ZIP"
 # feed entry for this release, which Tools/publish-release.sh adds to
 # appcast.xml when the release is published.
 SPARKLE_ACCOUNT="${AVM_SPARKLE_ACCOUNT:-fullcircleat-avm}"
-REPO_SLUG="${AVM_REPO:-amenathomas1997/accessible-virtual-machine}"
+REPO_SLUG="${AVM_REPO:-amenathomas1997/guest-house}"
 SIGN_UPDATE="$(find "$BUILD_DIR/DerivedData/SourcePackages/artifacts" -path '*Sparkle/bin/sign_update' -type f 2>/dev/null | sed -n 1p || true)"
 if [ "$SIGN_FOR_UPDATES" = "0" ]; then
     info "Not signing for updates (--no-update-signing); this build can't be published."

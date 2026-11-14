@@ -1279,6 +1279,34 @@ final class SPICECoordinator: NSObject, CSConnectionDelegate {
     private weak var manager: VMManager?
     /// Set on the main thread before connect; read by spiceConnected.
     private var shareForConnection: (path: String, readOnly: Bool)?
+    /// The id connect() shared a folder for, so a change in Settings finds
+    /// this connection (2026-11-14).
+    private var sharingFor: UUID?
+    /// Connections that are up, to reach a running machine's.
+    private static let live = NSHashTable<SPICECoordinator>.weakObjects()
+
+    /// A shared folder chosen, changed or stopped in Settings while the
+    /// machine runs (2026-11-14, a tester): it used to wait for the next
+    /// start, and until then Windows showed the empty stand-in folder,
+    /// "This folder is empty", which read as a mistake of the user's.
+    /// SPICE's WebDAV server takes a new folder while it runs. True when
+    /// a running connection got it.
+    @discardableResult
+    static func sharedFolderChanged(for id: UUID) -> Bool {
+        guard let saved = VMStore.shared?.configurations.first(where: { $0.id == id }) else { return false }
+        let path = saved.sharedFolderURL?.path ?? emptyShare.path
+        let readOnly = saved.sharedFolderURL == nil ? true : saved.sharedFolderIsReadOnly
+        var reached = false
+        for coordinator in live.allObjects where coordinator.sharingFor == id {
+            coordinator.shareForConnection = (path, readOnly)
+            guard let connection = coordinator.connection else { continue }
+            // On SPICE's own thread, as spiceConnected's call is.
+            CSMain.shared.async { connection.session.setSharedDirectory(path, readOnly: readOnly) }
+            reached = true
+        }
+        avmPublicLog("Shared folder changed for a running machine: \(reached ? "applied" : "no connection to apply it to").")
+        return reached
+    }
 
     init(focusLock: FocusLockManager, machineID: UUID? = nil, manager: VMManager? = nil) {
         self.focusLock = focusLock
@@ -1412,6 +1440,8 @@ final class SPICECoordinator: NSObject, CSConnectionDelegate {
 
         // What spiceConnected shares (2026-11-09, fourth audit #11).
         let id = machineID ?? VMSession.current?.configuration.id
+        sharingFor = id
+        Self.live.add(self)
         let saved = id.flatMap { id in VMStore.shared?.configurations.first { $0.id == id } }
         if let folder = saved?.sharedFolderURL {
             shareForConnection = (folder.path, saved?.sharedFolderIsReadOnly ?? false)

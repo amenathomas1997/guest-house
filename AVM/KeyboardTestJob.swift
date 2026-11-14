@@ -93,6 +93,17 @@ enum KeyboardTestJob {
         }
         print("SERVING")
         fflush(stdout)
+        // --then-folder <folder> --after <seconds> (2026-11-14): the folder
+        // changed while the machine runs, as saving Settings changes it.
+        if let t = arguments.firstIndex(of: "--then-folder"), arguments.indices.contains(t + 1),
+           let a = arguments.firstIndex(of: "--after"), arguments.indices.contains(a + 1), let seconds = TimeInterval(arguments[a + 1]) {
+            let next = arguments[t + 1]
+            DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+                client.changeSharedFolder(next)
+                print("CHANGED")
+                fflush(stdout)
+            }
+        }
         while true { RunLoop.main.run(until: Date().addingTimeInterval(1)) }
     }
 
@@ -224,6 +235,12 @@ enum KeyboardTestJob {
             if let sharedFolder {
                 connection.session.setSharedDirectory(sharedFolder, readOnly: false)
             }
+        }
+        /// As SPICECoordinator.sharedFolderChanged does it: on SPICE's thread.
+        func changeSharedFolder(_ folder: String) {
+            sharedFolder = folder
+            guard let connection else { return }
+            CSMain.shared.async { connection.session.setSharedDirectory(folder, readOnly: false) }
         }
         func spiceDisconnected(_ connection: CSConnection) {}
         func spiceInputAvailable(_ connection: CSConnection, input: CSInput) {

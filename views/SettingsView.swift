@@ -1491,8 +1491,8 @@ struct SettingsView: View {
                 Toggle("\(guest) can only read it, not change it", isOn: $sharedFolderReadOnly)
             }
             Text(configuration.guestOS == .windows
-                 ? "\(guest) shows the folder in File Explorer as a network drive. Changes take effect the next time \(guest) starts. Windows installed by this version of Guest House is ready for it; for an older Windows, install spice-webdavd from spice-space.org in Windows first."
-                 : "\(guest) shows the folder in Files as Mac shared folder, in the sidebar. Changes take effect the next time \(guest) starts. \(guest) installed by this version of Guest House is ready for it.")
+                 ? "\(guest) shows the folder in File Explorer as a network drive. A running \(guest) gets a change as soon as you save. Windows installed by this version of Guest House is ready for it; for an older Windows, install spice-webdavd from spice-space.org in Windows first."
+                 : "\(guest) shows the folder in Files as Mac shared folder, in the sidebar. A running \(guest) gets a change as soon as you save. \(guest) installed by this version of Guest House is ready for it.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1975,6 +1975,14 @@ struct SettingsView: View {
                 }
             }
             vmStore.save(updated)
+            // Its shared folder at once (2026-11-14): no restart.
+            if updated.sharedFolderPath != saved.sharedFolderPath || updated.sharedFolderIsReadOnly != saved.sharedFolderIsReadOnly,
+               SPICECoordinator.sharedFolderChanged(for: updated.id) {
+                let folder = updated.sharedFolderURL?.lastPathComponent
+                let place = updated.guestOS == .windows ? "in File Explorer, as its network drive" : "in Files, as Mac shared folder"
+                Announcer.shared.announce(folder.map { "\(updated.name) has \($0) now, \(place). If it still shows the old contents, refresh it with F5." }
+                                          ?? "\(updated.name) no longer has a shared folder.", tone: .info)
+            }
             // Its sound too (2026-11-01).
             if let manager = MachineSessions.shared.session(for: updated.id)?.manager {
                 Task { await manager.applySoundLevels(updated) }
@@ -2010,7 +2018,7 @@ struct SettingsView: View {
                 // What really waits (audit of 2026-11-10 #36): sound, the
                 // clipboard, the display, the trackpad, the name and Remote
                 // Desktop apply at once, and this said only USB did.
-                message = "Settings saved. Changes to USB, sound, the clipboard, the display, the trackpad, the name and Remote Desktop apply right away; the others take effect when \(guest) next starts after shutting down."
+                message = "Settings saved. Changes to USB, sound, the shared folder, the clipboard, the display, the trackpad, the name and Remote Desktop apply right away; the others take effect when \(guest) next starts after shutting down."
             } else {
                 message = "Settings saved. Changes take effect the next time you start \(guest)."
             }

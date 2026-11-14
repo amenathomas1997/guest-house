@@ -20,7 +20,8 @@
 #     labels that start with it (com.fullcircleat.avm-clipboard, in macOS
 #     guests), and for a tree from before the rename (com.fullcircleat.AVM);
 #   - team 9G2D7CDZ5D -> 4NZJSBJ32X;
-#   - amenathomas1997/... repository and CocoaSpice links -> allisonfm85/...;
+#   - amenathomas1997/guest-house (accessible-virtual-machine until
+#     2026-11-14) and CocoaSpice links -> allisonfm85/...;
 #   - SUFeedURL and SUPublicEDKey, appcast.xml, and the version numbers:
 #     hers, from her main;
 #   - the update key's keychain account: Sparkle's default, ed25519;
@@ -165,6 +166,7 @@ fi
         -e 's/com\.fullcircleat\.AVM/com.alllisonmeloy.AVM/g' \
         -e 's/com\.fullcircleat\.avm-/com.alllisonmeloy.avm-/g' \
         -e 's/9G2D7CDZ5D/4NZJSBJ32X/g' \
+        -e 's#amenathomas1997/guest-house#allisonfm85/accessible-virtual-machine#g' \
         -e 's#amenathomas1997/accessible-virtual-machine#allisonfm85/accessible-virtual-machine#g' \
         -e 's#amenathomas1997/CocoaSpice#allisonfm85/CocoaSpice#g' \
         -e 's/fullcircleat-avm/ed25519/g'
@@ -261,7 +263,7 @@ git diff --cached --stat "${PARENTS[0]}" | tail -1 >&2
 if [ -z "$MESSAGE" ]; then
     MESSAGE="$WT/.sync-message"
     printf '%s\n\n%s\n%s\n' \
-        "Sync with amenathomas1997/accessible-virtual-machine $TREE ($(git rev-parse --short "$SRC_SHA"))" \
+        "Sync with amenathomas1997/guest-house $TREE ($(git rev-parse --short "$SRC_SHA"))" \
         "Made by Tools/$SELF: this fork's $TREE with the original" \
         "project's identity, feed, key and version numbers kept." > "$MESSAGE"
 fi

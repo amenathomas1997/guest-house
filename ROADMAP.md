@@ -14,7 +14,7 @@ right one.
 
 Have a request or want to influence priorities? Open an issue at the
 repository:
-https://github.com/amenathomas1997/accessible-virtual-machine/issues
+https://github.com/amenathomas1997/guest-house/issues
 
 ## Done
 
