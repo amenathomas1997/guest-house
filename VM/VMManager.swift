@@ -923,7 +923,7 @@ final class VMManager: ObservableObject {
         let found = listing.output.uppercased().contains("AVMDONE")
         avmLog("checkInstallCompleteMarker: marker \(found ? "PRESENT" : "absent") on \(imgPath)")
         if found, configuration.installMarkerSeen != true {
-            UsageCounts.note(configuration.guestOS == .windows ? .installFinishedWindows : .installFinishedLinux)   // fork-only-line
+            UsageCountsSender.noteInstallEnded(configuration, finished: true)   // fork-only-line
             // Remembered (2026-10-28): see below. Only for a machine in the
             // list (fourth audit: a test job's isn't).
             if var updated = VMStore.shared?.configurations.first(where: { $0.id == configuration.id }) {
@@ -1241,7 +1241,7 @@ final class VMManager: ObservableObject {
 
         do {
             let output = try await runMediaBuild(for: configuration) { try await pipeline.run(input) }
-            UsageCounts.note(.installStartedWindows)   // fork-only-line
+            UsageCountsSender.noteInstallStarted(configuration)   // fork-only-line
             avmLog("ensureInstallMedia: pipeline complete — \(output.rebuiltISOPath)")
             WindowsSetupAnswers.forgetPassword(inVMDirectory: runtimeDir)
             // Not after a Force Stop during the build (2026-10-28, code
@@ -1318,7 +1318,7 @@ final class VMManager: ObservableObject {
                 diskName: configuration.usesVirtioDisk ? "vda" : "nvme0n1"
             )
             try await runMediaBuild(for: configuration) { try await pipeline.run(ubuntuInput) }
-            UsageCounts.note(.installStartedLinux)   // fork-only-line
+            UsageCountsSender.noteInstallStarted(configuration)   // fork-only-line
             // Not after a Force Stop during the build (2026-10-28, code
             // review): the next check ends the start.
             guard buildIsWanted else { return }
@@ -2457,7 +2457,7 @@ final class VMManager: ObservableObject {
                     let minutes = (minutesSinceFailureMarker ?? -1) + 1
                     minutesSinceFailureMarker = minutes
                     if minutes == 0 { avmLog("ubuntuStallWatch: AVMFAIL.TAG appeared; waiting for the installer's power-off") }
-                    if minutes == 0 { UsageCounts.note(.installFailedLinux) }   // fork-only-line
+                    if minutes == 0, let failing = activeConfiguration { UsageCountsSender.noteInstallEnded(failing, finished: false) }   // fork-only-line
                     if minutes >= 3 {
                         avmLog("ubuntuStallWatch: AVMFAIL.TAG present and still running after 3 minutes — stopping the VM")
                         await MainActor.run {

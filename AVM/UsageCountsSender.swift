@@ -69,6 +69,33 @@ enum UsageCountsSender {
         UserDefaults.standard.set(true, forKey: UsageCounts.closedCleanlyKey)
     }
 
+    /// The machines whose install this copy saw start and hasn't seen end.
+    /// Their identifiers stay on this Mac: only the counts are ever sent.
+    private static let installingKey = "UsageCountsInstalling"
+
+    static func noteInstallStarted(_ configuration: VMConfiguration) {
+        var installing = Set(UserDefaults.standard.stringArray(forKey: installingKey) ?? [])
+        // Building the media again for the same machine is the same install.
+        guard installing.insert(configuration.id.uuidString).inserted else { return }
+        UserDefaults.standard.set(Array(installing), forKey: installingKey)
+        UsageCounts.note(configuration.guestOS == .windows ? .installStartedWindows : .installStartedLinux)
+    }
+
+    /// Only for an install seen starting (2026-11-14, found by the live
+    /// jobs): the finished marker is also found on every start of a machine
+    /// a test runs outside the list, and on one installed before this
+    /// existed, and each was counted as an install finishing.
+    static func noteInstallEnded(_ configuration: VMConfiguration, finished: Bool) {
+        var installing = Set(UserDefaults.standard.stringArray(forKey: installingKey) ?? [])
+        guard installing.remove(configuration.id.uuidString) != nil else { return }
+        UserDefaults.standard.set(Array(installing), forKey: installingKey)
+        if finished {
+            UsageCounts.note(configuration.guestOS == .windows ? .installFinishedWindows : .installFinishedLinux)
+        } else if configuration.guestOS != .windows {
+            UsageCounts.note(.installFailedLinux)
+        }
+    }
+
     /// A machine reached running: that, and what it was set up with.
     static func noteStart(_ configuration: VMConfiguration) {
         UsageCounts.note(.machineStarted)
