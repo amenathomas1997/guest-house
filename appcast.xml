@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.49</title>
+            <sparkle:version>69</sparkle:version>
+            <sparkle:shortVersionString>0.4.49</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>A shared folder no longer needs a restart. Choose a folder in a machine&#x27;s Settings and press Save, and a machine that is running gets it straight away; Guest House says so. Before, Windows showed &quot;This folder is empty&quot; until it had been shut down and started again. If File Explorer still shows the old contents, press F5.</li><li>Install Apps, in the Virtual Machine menu, now works in Linux machines too. It lists the apps your Linux system&#x27;s own software sources have, up to 17 of them, such as Firefox, Thunderbird, LibreOffice, VLC, Audacity, calibre and KeePassXC, and installs the ones you tick with no questions. This was tested in Debian; in Ubuntu, Fedora and the others it uses the same steps with that system&#x27;s own package manager.</li><li>Guest House&#x27;s project on GitHub has a new address: github.com/amenathomas1997/guest-house. Help, then Report a Problem, and the README link in the Help menu go there. Old links still work.</li></ul>]]></description>
+            <pubDate>Sat, 14 Nov 2026 19:32:12 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.49/GuestHouse-0.4.49.zip" sparkle:edSignature="J3YQgPfRhBWb3IRGSY+Btypy33+SxrFOY/OqiaZRFtcq6IwT4DPnd5augLERSfZi/g2eTC9oiCRyFYi9i/7FDQ==" length="106736258" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.48</title>
             <sparkle:version>68</sparkle:version>
             <sparkle:shortVersionString>0.4.48</sparkle:shortVersionString>
