@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.51</title>
+            <sparkle:version>71</sparkle:version>
+            <sparkle:shortVersionString>0.4.51</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>If you agreed to share anonymous usage counts, Guest House will ask one more question: whether to add a little more to that daily message. If you choose Keep It As It Is, it goes on sending only what you agreed to before. If you haven&#x27;t been asked about usage counts yet, you&#x27;ll get one question that covers everything.</li><li>The extra part would be: which features were used since the last message, by name only, such as a shared folder, Save or Install Apps; whether installs of Windows or Linux started, finished or failed; which screen readers your machines were set up with; whether Guest House closed unexpectedly; and roughly how long you have used it. This shows me what people rely on and where installs go wrong.</li><li>As before, it never sends your name, an install number, your machines&#x27; names, anything you type, or any files. Settings, under General, has a switch for each part and shows what today&#x27;s message would hold, and every message sent is written to the diagnostic log.</li></ul>]]></description>
+            <pubDate>Sat, 14 Nov 2026 23:56:42 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.51/GuestHouse-0.4.51.zip" sparkle:edSignature="M/PbURbDiyj/tLEmDTDC9EgAQCzWTE9WFliYHG6FOGMV+98JBD0yUzb9OiAukMULy3fZbqu1KXc2fR67u9k3AQ==" length="106766728" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.50</title>
             <sparkle:version>70</sparkle:version>
             <sparkle:shortVersionString>0.4.50</sparkle:shortVersionString>
