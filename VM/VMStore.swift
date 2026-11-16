@@ -24,6 +24,19 @@ struct OrphanedVMDirectory: Identifiable, Hashable {
 
 final class VMStore: ObservableObject {
 
+    // AN EMPTY DEINIT, ON PURPOSE (2026-11-16, MEASURED on GitHub's macOS 15
+    // runner): with the main actor as the default, a class with no deinit
+    // gets one that hops to the main actor (swift_task_deinitOnExecutor).
+    // macOS before 26 has no such call, so the compiler builds in a stand-in,
+    // and the stand-in from Swift 6.2.4 aborted when a VMStore was freed:
+    // "pointer being freed was not allocated", in TaskLocal::StopLookupScope,
+    // under VMStore.__deallocating_deinit. The logic tests free one
+    // (PermanentDeleteTests), so every CI run that found a runner failed from
+    // 0.4.41 on, with no message. A written deinit is nonisolated, and
+    // nothing here needs the main actor to be let go of. The app keeps one
+    // VMStore for its whole life, so it never met this.
+    deinit {}
+
     // MARK: - Published State
 
     @Published private(set) var configurations: [VMConfiguration] = []
