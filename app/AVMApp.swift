@@ -83,6 +83,7 @@ struct AVMApp: App {
         KeyboardTestJob.runIfAsked()
         KeyboardTestJob.playAudioIfAsked()
         KeyboardTestJob.serveFolderIfAsked()
+        KeyboardTestJob.controlKeysIfAsked()
         SaveResumeTestJob.runIfAsked()
         // fork-only
         UsageCountsSender.runTestIfAsked()

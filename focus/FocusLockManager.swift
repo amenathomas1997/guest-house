@@ -372,6 +372,7 @@ class FocusLockManager: ObservableObject {
             Announcer.shared.announce("\(guest) is running. To use it, switch to Guest House and press Command Shift E.", tone: .info)
             return
         }
+        MacShortcutsInMachine.off()
         NSApp.presentationOptions = [
             .hideDock,
             .hideMenuBar,
@@ -428,6 +429,7 @@ class FocusLockManager: ObservableObject {
         // after the user has asked to leave.
         stopEnforcement()
         NSApp.presentationOptions = []
+        MacShortcutsInMachine.on()
         unregisterHotKey()
         isLocked = false
         lockedMachineID = nil
@@ -688,5 +690,47 @@ class FocusLockManager: ObservableObject {
         stopEnforcement()
         unregisterHotKey()
         NSApp.presentationOptions = []
+        MacShortcutsInMachine.on()
+    }
+}
+
+/// The Mac's own shortcuts, off while the keyboard is in a machine
+/// (2026-11-16, the user's report: Control-Tab, Control-Space and Control-F4
+/// didn't reach Windows; those three turned out to be claimable in the
+/// machine's view, see performKeyEquivalent). What is left is what macOS
+/// takes before any app sees the key: Mission Control and Spaces on
+/// Control with the arrows, input sources on Control-Space, Spotlight on
+/// Command-Space. A machine never gets those. Carbon's symbolic hot key
+/// mode turns them off for the front app, and macOS puts them back by
+/// itself when Guest House stops being the front app or quits. macOS only
+/// honours it for an app the user has allowed under Accessibility, so
+/// without that this does nothing and MachineCheck says which keys the Mac
+/// keeps. The accessibility shortcuts (VoiceOver's Command-F5, zoom) stay
+/// on, and Control-Command-Escape, the way back, is Guest House's own hot
+/// key and isn't one of these.
+@MainActor
+enum MacShortcutsInMachine {
+    private static var token: UnsafeMutableRawPointer?
+
+    /// Whether macOS will honour it.
+    static var allowed: Bool { AXIsProcessTrusted() }
+
+    /// Shows macOS's own request to allow Guest House under Accessibility.
+    static func ask() {
+        let prompt = "AXTrustedCheckOptionPrompt" as CFString
+        _ = AXIsProcessTrustedWithOptions([prompt: true] as CFDictionary)
+    }
+
+    static func off() {
+        guard token == nil, allowed else { return }
+        token = PushSymbolicHotKeyMode(OptionBits(kHIHotKeyModeAllDisabledExceptUniversalAccess))
+        AVMLog.write("Guest House: the Mac's own shortcuts are off while the keyboard is in a machine")
+    }
+
+    static func on() {
+        guard let held = token else { return }
+        PopSymbolicHotKeyMode(held)
+        token = nil
+        AVMLog.write("Guest House: the Mac's own shortcuts are back")
     }
 }

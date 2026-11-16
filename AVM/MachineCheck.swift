@@ -104,10 +104,17 @@ extension VMManager {
     /// Once each time Guest House opens, as a Windows machine starts: every start would
     /// nag someone who keeps them for Spaces.
     func warnAboutMacSpacesShortcuts(_ configuration: VMConfiguration) {
-        guard configuration.guestOS == .windows, !Self.warnedAboutMacSpacesShortcuts, Self.macTakesControlArrows else { return }
+        // Nothing to say when Guest House turns them off itself.
+        guard configuration.guestOS == .windows, !Self.warnedAboutMacSpacesShortcuts, !MacShortcutsInMachine.allowed else { return }
+        // Every Control key the Mac holds, not only the arrows for Spaces
+        // (2026-11-16): Control-F4 and its neighbours, Control-Up and Down.
+        let domain = "com.apple.symbolichotkeys" as CFString
+        CFPreferencesAppSynchronize(domain)
+        let kept = MacKeptKeys.kept(CFPreferencesCopyAppValue("AppleSymbolicHotKeys" as CFString, domain) as? [String: Any])
+        guard !kept.isEmpty else { return }
         Self.warnedAboutMacSpacesShortcuts = true
-        AVMLog.write("Guest House: the Mac's Spaces shortcuts hold Control and the arrows")
-        Announcer.shared.announce(MacSpacesShortcuts.words(machine: configuration.name), tone: .info)
+        AVMLog.write("Guest House: the Mac's own shortcuts hold \(MacKeptKeys.names(kept))")
+        Announcer.shared.announce(MacKeptKeys.words(machine: configuration.name, kept: kept), tone: .info)
     }
     private static var warnedAboutMacSpacesShortcuts = false
 }

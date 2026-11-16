@@ -793,7 +793,21 @@ final class SPICEKeyCaptureView: MTKView {
         // CONTROL WITH THE MOVING KEYS (2026-11-02, the user's report): Control-Fn-
         // Right is Control-End in Windows and the end of a document, but the Mac's
         // Window menu has Fn-Control-arrows for tiling, and the menu got it first.
-        if AVMKeysInMachine.isControlMoving(keyCode: event.keyCode, modifiers: event.modifierFlags) {
+        // EVERY CONTROL KEY (2026-11-16, the user's report, MEASURED): Control-Tab
+        // didn't reach Windows. A key-logging window on the user's Mac, with
+        // VoiceOver on and the built-in keyboard, showed a real Control-Tab
+        // offered here first and, when not claimed, never delivered to keyDown:
+        // only its keyUp arrived. AppKit takes it to move between controls.
+        // Control-Space was offered here and then did reach keyDown. A second
+        // run claimed them here, as this does, and every one arrived: Control-
+        // Tab, Control-Shift-Tab, Control-Space, Control-F4, Control-F6 and
+        // Control with Up and Down. Option with Tab or the arrows goes straight
+        // to keyDown and was never lost. So any
+        // Control key without Command is claimed here, as the moving keys
+        // already were; its release still comes through keyUp. Events sent
+        // from code with NSApp.sendEvent don't show the loss: only a real
+        // key press does.
+        if AVMKeysInMachine.isControlKey(modifiers: event.modifierFlags) {
             coordinator.handleKey(event: event, pressed: true)
             return true
         }
@@ -1671,7 +1685,11 @@ final class SPICECoordinator: NSObject, CSConnectionDelegate {
         input.send(.press, code: code)
         input.send(.release, code: code)
     }
+    /// Presses that reached handleKey, for --test-control-keys.
+    nonisolated(unsafe) static var pressesSeenForTest = 0
+
     func handleKey(event: NSEvent, pressed: Bool) {
+        if pressed { Self.pressesSeenForTest += 1 }
         guard isLocked, let input else {
             NSLog("Guest House: handleKey gated — locked=\(isLocked), input=\(input != nil ? "present" : "nil")")
             return

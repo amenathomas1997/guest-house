@@ -75,6 +75,7 @@ struct AppPreferencesView: View {
     @AppStorage(GuestWatchSettings.holdWhileInMachineKey) private var holdWhileInMachine = true
     @AppStorage(GuestWatchSettings.useSavedSetupKey) private var useSavedSetup = false
     @AppStorage(UpdateChannels.earlyKey) private var earlyUpdates = false
+    @State private var macShortcutsAllowed = MacShortcutsInMachine.allowed
     // fork-only
     @AppStorage(UsageCounts.choiceKey) private var usageCountsChoice = ""
     @AppStorage(UsageCounts.detailKey) private var usageCountsDetail = ""
@@ -222,6 +223,22 @@ struct AppPreferencesView: View {
             Text("NVDA, JAWS and Narrator can use Caps Lock as their key. A Mac sends Caps Lock only when it's pressed and let go, so while your keyboard is in Windows, Guest House has the Mac send it as a key Windows can hold. Your Mac's Caps Lock is back as it was when your keyboard returns to the Mac. Changes take effect the next time you go into Windows.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
+            // The Mac's own shortcuts (2026-11-16, MacShortcutsInMachine).
+            Text("The Mac's shortcut keys")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            Text(macShortcutsAllowed
+                 ? "Guest House turns the Mac's own shortcuts off while your keyboard is in a machine, so keys such as Control with the arrows, Control-Space and Command-Space reach it. They come back the moment you return to the Mac. VoiceOver's Command-F5 always stays."
+                 : "Your Mac may keep some keys for its own shortcuts, such as Control with the arrows for Mission Control and Spaces, Control-Space for switching keyboard languages, and Command-Space for Spotlight. Those never reach a machine. If you allow Guest House under Accessibility, it turns those shortcuts off only while your keyboard is in a machine, and they come back the moment you return to the Mac.")
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+            if !macShortcutsAllowed {
+                Button("Give Machines the Mac's Shortcut Keys…") {
+                    MacShortcutsInMachine.ask()
+                    Announcer.shared.announce("macOS asks next. Choose Open System Settings, then turn on Guest House under Accessibility. It takes effect the next time your keyboard goes into a machine.", tone: .info)
+                }
+                .accessibilityHint("Opens macOS's request to allow Guest House under Accessibility")
+            }
             Text("To return to the Mac from Windows, press Control-Command-Escape. A second keyboard just for Windows is chosen in a machine's Settings, under Devices.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)

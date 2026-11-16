@@ -78,6 +78,70 @@ enum KeyboardTestJob {
         while true { RunLoop.main.run(until: Date().addingTimeInterval(1)) }
     }
 
+    /// `Guest House --test-control-keys` (2026-11-16, a report that Control-Tab,
+    /// Control-Space and Control-F4 didn't reach Windows): do Control keys
+    /// that arrive at Guest House reach the code that sends keys to the
+    /// machine? A small window with the machine's own key view and a button
+    /// beside it (somewhere for Control-Tab to go), the keyboard marked as
+    /// in the machine, and key events sent through NSApp. No machine runs.
+    /// A check that the path works, and no more: events sent from code
+    /// reach the handler even under the old rule, which lost a real
+    /// Control-Tab (measured with a key-logging window, ~/Developer/
+    /// avm-probe/keyprobe). Keys the Mac itself takes, such as Control-F4,
+    /// never arrive at all (MacShortcutsInMachine).
+    static func controlKeysIfAsked(arguments: [String] = CommandLine.arguments) {
+        guard arguments.contains("--test-control-keys") else { return }
+        AVMLog.useTestLogFolder()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            MainActor.assumeIsolated {
+                print("   keyboard navigation of all controls, as VoiceOver turns on: \(NSApp.isFullKeyboardAccessEnabled ? "on" : "off")")
+                let focus = FocusLockManager()
+                let coordinator = SPICECoordinator(focusLock: focus)
+                let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 360, height: 160), styleMask: [.titled], backing: .buffered, defer: false)
+                window.title = "Guest House key test"
+                let view = SPICEKeyCaptureView(frame: NSRect(x: 0, y: 40, width: 360, height: 120), device: nil)
+                view.coordinator = coordinator
+                let button = NSButton(title: "Another control", target: nil, action: nil)
+                button.frame = NSRect(x: 10, y: 5, width: 160, height: 30)
+                window.contentView?.addSubview(view)
+                window.contentView?.addSubview(button)
+                window.center()
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
+                window.makeFirstResponder(view)
+                focus.isLocked = true
+                var failed = false
+                func press(_ name: String, _ keyCode: UInt16, _ flags: NSEvent.ModifierFlags, _ characters: String, expected: Bool = true) {
+                    guard let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
+                                                       windowNumber: window.windowNumber, context: nil, characters: characters,
+                                                       charactersIgnoringModifiers: characters, isARepeat: false, keyCode: keyCode) else { return }
+                    window.makeFirstResponder(view)
+                    let before = SPICECoordinator.pressesSeenForTest
+                    NSApp.sendEvent(event)
+                    let reached = SPICECoordinator.pressesSeenForTest > before
+                    let kept = window.firstResponder === view
+                    if reached != expected || !kept { failed = true }
+                    print("   \(reached && kept ? "yes" : "NO ")  \(name): \(reached ? "reached the machine's keys" : "did not reach the machine's keys")\(kept ? "" : ", and the keyboard left the machine's view")")
+                }
+                let functionKey = String(UnicodeScalar(NSF4FunctionKey)!)
+                press("a plain letter", 0, [], "a")
+                press("Control-Tab", 48, [.control], "\t")
+                press("Control-Shift-Tab", 48, [.control, .shift], "\u{19}")
+                press("Control-Space", 49, [.control], " ")
+                press("Control-F4", 118, [.control, .function], functionKey)
+                press("Control-F6", 97, [.control, .function], String(UnicodeScalar(NSF6FunctionKey)!))
+                press("Control-A", 0, [.control], "\u{01}")
+                press("Control-Escape", 53, [.control], "\u{1b}")
+                press("Control-Right Arrow", 124, [.control, .function, .numericPad], String(UnicodeScalar(NSRightArrowFunctionKey)!))
+                focus.isLocked = false
+                window.orderOut(nil)
+                print(failed ? "FAILED" : "PASSED")
+                fflush(stdout)
+                exit(failed ? 1 : 0)
+            }
+        }
+    }
+
     /// `Guest House --serve-folder <folder> --spice <spice.sock>` (2026-10-27): a
     /// SPICE client that only serves a folder, as a machine's window does,
     /// for the shared folder test; runs until it's ended.

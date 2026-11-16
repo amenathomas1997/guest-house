@@ -103,6 +103,13 @@ nonisolated enum AVMKeysInMachine {
     }
     private static let movingKeys: Set<UInt16> = [123, 124, 125, 126, 115, 119, 116, 121]
 
+    /// Control with any key, and no Command. With the keyboard in a machine
+    /// every one is the machine's. Control with Command stays as it was:
+    /// Command is the Windows key, and Control-Command-Escape is the way back.
+    static func isControlKey(modifiers: NSEvent.ModifierFlags) -> Bool {
+        modifiers.contains(.control) && !modifiers.contains(.command)
+    }
+
     static func isAVMs(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
         switch modifiers.intersection([.control, .command, .option, .shift]) {
         case [.command, .shift]: return plain.contains(keyCode)
@@ -294,6 +301,69 @@ nonisolated struct MachineCheckResult: Sendable {
         let list = problems.map { "\($0.what). Next: \($0.next)." }.joined(separator: " ")
         let count = problems.count == 1 ? "one problem" : "\(problems.count) problems"
         return "\(machine) has \(count): \(list)" + (fine.isEmpty ? "" : " Fine: \(fine.joined(separator: ", ")).")
+    }
+}
+
+/// Control keys the Mac itself takes before any app sees them (2026-11-16):
+/// its own shortcuts for Mission Control, Spaces and input sources. These
+/// never arrive at Guest House at all. With Accessibility allowed, Guest House
+/// turns them off while the keyboard is in a machine
+/// (MacShortcutsInMachine); without it, it says which are on and where
+/// to turn them off.
+/// Each is Apple's number in com.apple.symbolichotkeys with the key it has
+/// by default; one that isn't in the list is at its default.
+nonisolated enum MacKeptKeys {
+    struct Shortcut: Equatable, Sendable {
+        let number: String
+        let keyCode: Int
+        let name: String
+        /// Where it is turned off, under Keyboard Shortcuts.
+        let pane: String
+        let onByDefault: Bool
+    }
+
+    static let all: [Shortcut] = [
+        Shortcut(number: "32", keyCode: 126, name: "Control-Up Arrow", pane: "Mission Control", onByDefault: true),
+        Shortcut(number: "33", keyCode: 125, name: "Control-Down Arrow", pane: "Mission Control", onByDefault: true),
+        Shortcut(number: "79", keyCode: 123, name: "Control-Left Arrow", pane: "Mission Control", onByDefault: true),
+        Shortcut(number: "81", keyCode: 124, name: "Control-Right Arrow", pane: "Mission Control", onByDefault: true),
+        // Not Control-F1 to F8, the Mac's keyboard-focus shortcuts: the app is
+        // offered those first (measured 2026-11-16: a real Control-F4 and
+        // Control-F6 arrived and were claimed), so Guest House takes them.
+        // Only acts with more than one input source, and is then written to the list.
+        Shortcut(number: "60", keyCode: 49, name: "Control-Space", pane: "Input Sources", onByDefault: false),
+    ]
+
+    /// The ones the Mac holds now: on, still on their default key, with Control alone.
+    static func kept(_ hotKeys: [String: Any]?) -> [Shortcut] {
+        all.filter { shortcut in
+            guard let entry = hotKeys?[shortcut.number] as? [String: Any] else { return shortcut.onByDefault }
+            if (entry["enabled"] as? NSNumber)?.boolValue == false { return false }
+            guard let value = entry["value"] as? [String: Any],
+                  let parameters = value["parameters"] as? [NSNumber], parameters.count == 3 else { return shortcut.onByDefault }
+            let modifiers = parameters[2].intValue
+            let control = 0x40000, otherModifiers = 0x20000 | 0x80000 | 0x100000
+            return parameters[1].intValue == shortcut.keyCode && modifiers & control != 0 && modifiers & otherModifiers == 0
+        }
+    }
+
+    /// "Control-F1 to Control-F8" for a run of function keys; the rest by name.
+    static func names(_ kept: [Shortcut]) -> String {
+        let functionKeys = kept.filter { $0.name.hasPrefix("Control-F") }
+        var names = kept.filter { !$0.name.hasPrefix("Control-F") }.map(\.name)
+        if functionKeys.count >= 3, let first = functionKeys.first, let last = functionKeys.last {
+            names.append("\(first.name) to \(last.name)")
+        } else {
+            names += functionKeys.map(\.name)
+        }
+        return names.count <= 1 ? names.joined() : names.dropLast().joined(separator: ", ") + " and " + (names.last ?? "")
+    }
+
+    static func words(machine: String, kept: [Shortcut]) -> String {
+        var panes: [String] = []
+        for shortcut in kept where !panes.contains(shortcut.pane) { panes.append(shortcut.pane) }
+        let places = panes.count <= 1 ? panes.joined() : panes.dropLast().joined(separator: ", ") + " and " + (panes.last ?? "")
+        return "Your Mac keeps \(names(kept)) for its own shortcuts, so \(kept.count == 1 ? "it" : "they") won't reach \(machine). In Windows these move by word and by paragraph, and Control-Space selects. Next: open Guest House's Settings, go to Keyboard, and choose Give Machines the Mac's Shortcut Keys; Guest House then turns them off only while your keyboard is in a machine. Or turn them off yourself in System Settings, under Keyboard, Keyboard Shortcuts, then \(places)."
     }
 }
 

@@ -260,6 +260,11 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.52", changes: [
+            "Control keys now go to the machine while your keyboard is in it. Control-Tab, Control-Shift-Tab, Control-Space, Control-F4 and Control-F6 were being taken by the Mac before Windows saw them, most of all with VoiceOver on. Guest House now takes every Control key for the machine first. If one still doesn't arrive, please tell me which.",
+            "A few keys are taken by macOS before any app sees them: Control with the arrows when the Mac's Mission Control and Spaces shortcuts are on, Control-Space on a Mac with more than one keyboard language, and Command-Space for Spotlight. Guest House's Settings, under Keyboard, has a new button, Give Machines the Mac's Shortcut Keys. It asks macOS to allow Guest House under Accessibility, and Guest House then turns those shortcuts off only while your keyboard is in a machine. They come back the moment you return to the Mac, and VoiceOver's Command-F5 always stays. This part is new and I'd like to hear whether it works for you.",
+            "Without that, Guest House tells you once, when a Windows machine starts, which of those keys your Mac is keeping and where to turn them off.",
+        ]),
         // fork-only
         ReleaseNote(version: "0.4.51", changes: [
             "If you agreed to share anonymous usage counts, Guest House will ask one more question: whether to add a little more to that daily message. If you choose Keep It As It Is, it goes on sending only what you agreed to before. If you haven't been asked about usage counts yet, you'll get one question that covers everything.",

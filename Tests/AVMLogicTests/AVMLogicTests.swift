@@ -2712,6 +2712,39 @@ final class OpenSUSEInstallTests: XCTestCase {
 
     /// Control and the arrows: on by default, off when turned off, and not
     /// in the way once moved to other keys.
+    /// Every Control key is the machine's while the keyboard is in it, and
+    /// the ones the Mac itself keeps are named (2026-11-16).
+    func testControlKeysAndTheOnesTheMacKeeps() {
+        XCTAssertTrue(AVMKeysInMachine.isControlKey(modifiers: [.control]), "Control-Tab, Control-Space")
+        XCTAssertTrue(AVMKeysInMachine.isControlKey(modifiers: [.control, .function]), "Control-F4")
+        XCTAssertTrue(AVMKeysInMachine.isControlKey(modifiers: [.control, .shift]), "Control-Shift-Tab")
+        XCTAssertTrue(AVMKeysInMachine.isControlKey(modifiers: [.control, .option]), "Control-Alt in Windows")
+        XCTAssertFalse(AVMKeysInMachine.isControlKey(modifiers: [.control, .command]), "the way back, and the Windows key's own")
+        XCTAssertFalse(AVMKeysInMachine.isControlKey(modifiers: [.shift]))
+        XCTAssertFalse(AVMKeysInMachine.isControlKey(modifiers: []))
+        func entry(enabled: Int, key: Int, modifiers: Int = 0x40000) -> [String: Any] {
+            ["enabled": NSNumber(value: enabled), "value": ["parameters": [NSNumber(value: 65535), NSNumber(value: key), NSNumber(value: modifiers)], "type": "standard"]]
+        }
+        // Nothing written: everything at its default, so the four arrows and not Control-Space.
+        XCTAssertEqual(MacKeptKeys.kept(nil).map(\.name), ["Control-Up Arrow", "Control-Down Arrow", "Control-Left Arrow", "Control-Right Arrow"])
+        // This Mac on 2026-11-16: Mission Control and Spaces turned off. Nothing is kept:
+        // Control-F1 to F8 are offered to the app first, and Guest House claims them.
+        let mine: [String: Any] = ["32": entry(enabled: 0, key: 126), "33": entry(enabled: 0, key: 125), "79": entry(enabled: 0, key: 123),
+                                   "81": entry(enabled: 0, key: 124), "60": entry(enabled: 0, key: 49)]
+        XCTAssertTrue(MacKeptKeys.kept(mine).isEmpty)
+        XCTAssertFalse(MacKeptKeys.all.contains { $0.name.hasPrefix("Control-F") })
+        // Spaces left on, one arrow moved to another key, and Control-Space turned on.
+        var changed = mine
+        changed["79"] = entry(enabled: 1, key: 123)
+        changed["81"] = entry(enabled: 1, key: 124, modifiers: 0x40000 | 0x80000)
+        changed["60"] = entry(enabled: 1, key: 49)
+        let kept = MacKeptKeys.kept(changed)
+        XCTAssertEqual(kept.map(\.name), ["Control-Left Arrow", "Control-Space"])
+        XCTAssertEqual(MacKeptKeys.names(kept), "Control-Left Arrow and Control-Space")
+        let words = MacKeptKeys.words(machine: "PC", kept: kept)
+        XCTAssertTrue(words.contains("Next:") && words.contains("Mission Control and Input Sources") && words.contains("Give Machines the Mac's Shortcut Keys"))
+    }
+
     func testMacSpacesShortcuts() {
         func entry(enabled: Int, key: Int? = nil, modifiers: Int = 8650752) -> [String: Any] {
             var e: [String: Any] = ["enabled": NSNumber(value: enabled)]
