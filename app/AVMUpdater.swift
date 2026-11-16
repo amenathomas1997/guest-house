@@ -260,6 +260,11 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.53", changes: [
+            "With your Mac's VoiceOver on, keys held with Control-Option never reach Windows or Linux, because VoiceOver keeps them for itself. Guest House now tells you this once when your keyboard goes into a machine.",
+            "New: while VoiceOver is on, hold Command-Option where Windows or Linux wants Control-Alt. Command-Option with a key is sent to the machine as Control-Alt with that key. This is new and I'd like to hear whether it works for you.",
+            "The other way is to turn VoiceOver off with Command-F5 while you are in the machine. If you do, Guest House turns VoiceOver back on when your keyboard returns to the Mac.",
+        ]),
         ReleaseNote(version: "0.4.52", changes: [
             "Control keys now go to the machine while your keyboard is in it. Control-Tab, Control-Shift-Tab, Control-Space, Control-F4 and Control-F6 were being taken by the Mac before Windows saw them, most of all with VoiceOver on. Guest House now takes every Control key for the machine first. If one still doesn't arrive, please tell me which.",
             "A few keys are taken by macOS before any app sees them: Control with the arrows when the Mac's Mission Control and Spaces shortcuts are on, Control-Space on a Mac with more than one keyboard language, and Command-Space for Spotlight. Guest House's Settings, under Keyboard, has a new button, Give Machines the Mac's Shortcut Keys. It asks macOS to allow Guest House under Accessibility, and Guest House then turns those shortcuts off only while your keyboard is in a machine. They come back the moment you return to the Mac, and VoiceOver's Command-F5 always stays. This part is new and I'd like to hear whether it works for you.",
