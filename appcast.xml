@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.52</title>
+            <sparkle:version>72</sparkle:version>
+            <sparkle:shortVersionString>0.4.52</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>Control keys now go to the machine while your keyboard is in it. Control-Tab, Control-Shift-Tab, Control-Space, Control-F4 and Control-F6 were being taken by the Mac before Windows saw them, most of all with VoiceOver on. Guest House now takes every Control key for the machine first. If one still doesn&#x27;t arrive, please tell me which.</li><li>A few keys are taken by macOS before any app sees them: Control with the arrows when the Mac&#x27;s Mission Control and Spaces shortcuts are on, Control-Space on a Mac with more than one keyboard language, and Command-Space for Spotlight. Guest House&#x27;s Settings, under Keyboard, has a new button, Give Machines the Mac&#x27;s Shortcut Keys. It asks macOS to allow Guest House under Accessibility, and Guest House then turns those shortcuts off only while your keyboard is in a machine. They come back the moment you return to the Mac, and VoiceOver&#x27;s Command-F5 always stays. This part is new and I&#x27;d like to hear whether it works for you.</li><li>Without that, Guest House tells you once, when a Windows machine starts, which of those keys your Mac is keeping and where to turn them off.</li></ul>]]></description>
+            <pubDate>Mon, 16 Nov 2026 16:58:45 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.52/GuestHouse-0.4.52.zip" sparkle:edSignature="ptyFfdpTOi7pWWknGvSCatygMyKuWA9Nkfm5cgEqUq0ZQKoIB3n6uke63esqVnTyfLm01Pbru3UN+uH5mXu5Ag==" length="106773212" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.51</title>
             <sparkle:version>71</sparkle:version>
             <sparkle:shortVersionString>0.4.51</sparkle:shortVersionString>
