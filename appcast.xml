@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.53</title>
+            <sparkle:version>73</sparkle:version>
+            <sparkle:shortVersionString>0.4.53</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>With your Mac&#x27;s VoiceOver on, keys held with Control-Option never reach Windows or Linux, because VoiceOver keeps them for itself. Guest House now tells you this once when your keyboard goes into a machine.</li><li>New: while VoiceOver is on, hold Command-Option where Windows or Linux wants Control-Alt. Command-Option with a key is sent to the machine as Control-Alt with that key. This is new and I&#x27;d like to hear whether it works for you.</li><li>The other way is to turn VoiceOver off with Command-F5 while you are in the machine. If you do, Guest House turns VoiceOver back on when your keyboard returns to the Mac.</li></ul>]]></description>
+            <pubDate>Mon, 16 Nov 2026 18:12:15 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.53/GuestHouse-0.4.53.zip" sparkle:edSignature="Qb7h4Z5dasJB1/CV/Yo4BEPzti8jYrst8ZaFw3SNrMXq89KEgQcv1nUnIH2nNcg72MroLvR0n8os5R/BgjX9DA==" length="106788679" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.52</title>
             <sparkle:version>72</sparkle:version>
             <sparkle:shortVersionString>0.4.52</sparkle:shortVersionString>
