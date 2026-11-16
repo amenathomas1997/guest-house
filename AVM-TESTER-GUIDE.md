@@ -496,6 +496,25 @@ will never hand your keyboard to Windows without you asking.
 **Never use Control-Option in a shortcut.** That's VoiceOver's own
 modifier, so Guest House stays away from it everywhere.
 
+### If you keep VoiceOver on
+
+You can leave VoiceOver on while your keyboard is in Windows. Most keys
+reach Windows anyway. The ones that don't are keys held with
+Control-Option, because VoiceOver keeps those for itself, and in Windows
+Control-Option is Control-Alt. So Control-Alt with the arrows (moving
+around a table in NVDA or JAWS) and Control-Alt-N (starting NVDA) do
+nothing.
+
+For those, hold **Command-Option** instead. While VoiceOver is on, Guest
+House sends Command-Option with a key to Windows as Control-Alt with that
+key. Command-Option-Right Arrow is Control-Alt-Right Arrow. Add Shift for
+Control-Alt-Shift. The Start menu doesn't open when you let go.
+
+Guest House tells you this the first time your keyboard goes into a
+machine with VoiceOver on. And if you turn VoiceOver off with Command-F5
+while you are in the machine, Guest House turns it back on when you
+return to the Mac.
+
 ### Two quirks worth knowing in advance
 
 **Command-F5 while your keyboard is in Windows may open the Start menu.**
@@ -659,6 +678,8 @@ dashboard's Start buttons work too.
 ### Mac keys inside Windows
 
 - **Command** acts as the **Windows key**.
+- **Command-Option** with a key is **Control-Alt** with that key, while
+  the Mac's VoiceOver is on. See section 8, "If you keep VoiceOver on".
 - **Caps Lock** is your screen reader key. See section 9.
 - **Control-Escape** opens Start, a useful alternative route.
 - **Function-Delete** is **forward delete**.

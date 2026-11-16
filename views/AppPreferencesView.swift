@@ -239,6 +239,13 @@ struct AppPreferencesView: View {
                 }
                 .accessibilityHint("Opens macOS's request to allow Guest House under Accessibility")
             }
+            // Command-Option for Control-Alt (2026-11-16, ControlAltStandIn).
+            Text(ControlAltStandIn.settingsHeading)
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            Text(ControlAltStandIn.settingsWords)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
             Text("To return to the Mac from Windows, press Control-Command-Escape. A second keyboard just for Windows is chosen in a machine's Settings, under Devices.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)

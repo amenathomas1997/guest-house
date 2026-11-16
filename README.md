@@ -321,6 +321,32 @@ where its Alt is. Guest House sends them as printed: Option is Alt, Command is
 Windows. To put them in a PC's order, remap them inside Windows, with
 SharpKeys for example.
 
+## Control-Alt keys with VoiceOver on
+
+Your Mac's VoiceOver keeps every key held with Control-Option for itself.
+In Windows and Linux, Control-Option is Control-Alt, so with VoiceOver on
+those keys never reach the machine: Control-Alt with the arrows to move
+around a table in NVDA or JAWS, Control-Alt-N to start NVDA, and so on.
+
+While VoiceOver is on and your keyboard is in a machine, hold
+**Command-Option** instead. Guest House sends Command-Option with a key
+to the machine as Control-Alt with that key:
+
+- Command-Option-Right Arrow is Control-Alt-Right Arrow.
+- Command-Option-N is Control-Alt-N.
+- Add Shift for Control-Alt-Shift.
+
+The Start menu doesn't open when you let go. With VoiceOver off, nothing
+changes: Control-Option reaches the machine by itself, and Command-Option
+is the Windows key with Alt, as printed.
+
+The other way is to turn VoiceOver off with Command-F5 once your keyboard
+is in the machine. Guest House turns it back on when you return to the Mac
+with Control-Command-Escape.
+
+Guest House says this the first time your keyboard goes into a machine
+with VoiceOver on, and it is in Settings, under Keyboard.
+
 ## Virtual machines in Command-Tab
 
 Each running virtual machine is in your Mac's Command-Tab list as an app

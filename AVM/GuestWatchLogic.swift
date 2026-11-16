@@ -344,7 +344,17 @@ nonisolated enum ControlAltStandIn {
         return steps
     }
 
-    static let hint = "With your Mac's VoiceOver on, hold Command-Option where Windows or Linux wants Control-Alt, since VoiceOver keeps Control-Option for itself. Or press Command-F5 to turn VoiceOver off; Guest House turns it back on when you return to the Mac."
+    static let hint = "VoiceOver is on, and it keeps Control-Option keys for itself. For Control-Alt in the machine, hold Command-Option instead: Command-Option-Right Arrow is Control-Alt-Right Arrow. Or press Command-F5 to turn VoiceOver off; Guest House turns it back on when you return to the Mac."
+    /// Settings, under Keyboard (2026-11-16: the user proved it with real
+    /// keys and asked for it to be easier to find).
+    static let settingsHeading = "Control-Alt keys with VoiceOver on"
+    static let settingsWords = "Your Mac's VoiceOver keeps keys held with Control-Option for itself, so with VoiceOver on, Control-Alt keys never reach Windows or Linux. While VoiceOver is on and your keyboard is in a machine, hold Command-Option instead: Command-Option-Right Arrow is sent as Control-Alt-Right Arrow, and Command-Option-N as Control-Alt-N. Add Shift for Control-Alt-Shift. With VoiceOver off, nothing changes. If you turn VoiceOver off with Command-F5 while in a machine, Guest House turns it back on when you return to the Mac."
+    /// The Virtual Machine menu's reminder, said on demand.
+    static func reminder(voiceOverOn: Bool) -> String {
+        voiceOverOn
+            ? "VoiceOver is on. For Control-Alt in a machine, hold Command-Option: Command-Option-Right Arrow is Control-Alt-Right Arrow. Add Shift for Control-Alt-Shift."
+            : "VoiceOver is off, so Control-Option reaches the machine as Control-Alt by itself. With VoiceOver on, hold Command-Option instead."
+    }
 }
 
 /// Control keys the Mac itself takes before any app sees them (2026-11-16):

@@ -2763,6 +2763,9 @@ final class OpenSUSEInstallTests: XCTestCase {
         XCTAssertEqual(ControlAltStandIn.steps(key: right, windowsKeyDown: nil),
                        [Step(press: true, code: 0x1D), Step(press: true, code: right), Step(press: false, code: right), Step(press: false, code: 0x1D)])
         XCTAssertTrue(ControlAltStandIn.hint.contains("Command-Option") && ControlAltStandIn.hint.contains("Command-F5"))
+        XCTAssertTrue(ControlAltStandIn.settingsWords.contains("Command-Option-Right Arrow"))
+        XCTAssertTrue(ControlAltStandIn.reminder(voiceOverOn: true).contains("hold Command-Option"))
+        XCTAssertTrue(ControlAltStandIn.reminder(voiceOverOn: false).contains("VoiceOver is off"))
     }
 
     func testMacSpacesShortcuts() {

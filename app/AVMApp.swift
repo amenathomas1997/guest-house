@@ -683,6 +683,11 @@ struct AVMApp: App {
                 Button("What's New in Guest House") {
                     ReleaseNotes.showRecent()
                 }
+                // Command-Option for Control-Alt (2026-11-16, ControlAltStandIn): the
+                // user proved it with real keys and asked that people be told better.
+                Button("Control-Alt Keys with VoiceOver On") {
+                    Announcer.shared.announce(ControlAltStandIn.reminder(voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled), tone: .info)
+                }
                 // The machine list from its kept copy (2026-11-05, second audit):
                 // an unreadable configurations.json was copied aside and the
                 // next save replaced it, with nothing in Guest House to bring it back.

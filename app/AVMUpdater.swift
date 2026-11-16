@@ -260,6 +260,11 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.54", changes: [
+            "Command-Option for Control-Alt, new in 0.4.53, is confirmed working: with your Mac's VoiceOver on, Command-Option with the arrows reaches Windows as Control-Alt with the arrows. Add Shift for Control-Alt-Shift.",
+            "It is easier to find out about. The notice when your keyboard goes into a machine with VoiceOver on is clearer and gives an example. Settings, under Keyboard, has a new part, Control-Alt Keys with VoiceOver On. And the Help menu has a new item of the same name that speaks a short reminder.",
+            "The README and the tester guide now describe it.",
+        ]),
         ReleaseNote(version: "0.4.53", changes: [
             "With your Mac's VoiceOver on, keys held with Control-Option never reach Windows or Linux, because VoiceOver keeps them for itself. Guest House now tells you this once when your keyboard goes into a machine.",
             "New: while VoiceOver is on, hold Command-Option where Windows or Linux wants Control-Alt. Command-Option with a key is sent to the machine as Control-Alt with that key. This is new and I'd like to hear whether it works for you.",
