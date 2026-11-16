@@ -20,8 +20,8 @@
 #
 # RUNNERS AGAIN (2026-11-16): from 2026-11-09 the macos-15 queue did the
 # same: 70 pushes marked failed, most never run. GitHub's note on each said
-# its Apple-silicon Macs were short. The Intel Macs are a separate queue,
-# and the logic tests don't care which processor they run on.
+# its Apple-silicon Macs were short. Not GitHub's Intel Macs: Guest House
+# is for Apple silicon only, and its tests run only there.
 
 name: CI
 
@@ -32,7 +32,7 @@ on:
 jobs:
   logic-tests:
     name: Logic tests
-    runs-on: macos-15-intel
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
