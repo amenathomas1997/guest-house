@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.54</title>
+            <sparkle:version>74</sparkle:version>
+            <sparkle:shortVersionString>0.4.54</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>Command-Option for Control-Alt, new in 0.4.53, is confirmed working: with your Mac&#x27;s VoiceOver on, Command-Option with the arrows reaches Windows as Control-Alt with the arrows. Add Shift for Control-Alt-Shift.</li><li>It is easier to find out about. The notice when your keyboard goes into a machine with VoiceOver on is clearer and gives an example. Settings, under Keyboard, has a new part, Control-Alt Keys with VoiceOver On. And the Help menu has a new item of the same name that speaks a short reminder.</li><li>The README and the tester guide now describe it.</li></ul>]]></description>
+            <pubDate>Mon, 16 Nov 2026 19:26:31 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.54/GuestHouse-0.4.54.zip" sparkle:edSignature="t+h1zGYPLiPO3HobADztvND26iMhm+mPg544ZAlTqI+4O7tLimqonH0yUgKD10reHvuxHvaXJJ0spPXOfFgNAg==" length="106790768" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.53</title>
             <sparkle:version>73</sparkle:version>
             <sparkle:shortVersionString>0.4.53</sparkle:shortVersionString>
