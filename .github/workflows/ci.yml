@@ -17,6 +17,11 @@
 # logic tests use macos-15, which has many more runners, with its newest
 # Xcode (the package needs Swift 6.2). The script and file checks need no
 # Mac at all and run on Linux.
+#
+# RUNNERS AGAIN (2026-11-16): from 2026-11-09 the macos-15 queue did the
+# same: 70 pushes marked failed, most never run. GitHub's note on each said
+# its Apple-silicon Macs were short. The Intel Macs are a separate queue,
+# and the logic tests don't care which processor they run on.
 
 name: CI
 
@@ -27,7 +32,7 @@ on:
 jobs:
   logic-tests:
     name: Logic tests
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
