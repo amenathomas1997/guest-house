@@ -2745,6 +2745,26 @@ final class OpenSUSEInstallTests: XCTestCase {
         XCTAssertTrue(words.contains("Next:") && words.contains("Mission Control and Input Sources") && words.contains("Give Machines the Mac's Shortcut Keys"))
     }
 
+    /// Command-Option for Control-Alt while VoiceOver is on (2026-11-16).
+    func testCommandOptionStandsInForControlAltWithVoiceOverOn() {
+        XCTAssertTrue(ControlAltStandIn.applies(modifiers: [.command, .option], voiceOverOn: true))
+        XCTAssertTrue(ControlAltStandIn.applies(modifiers: [.command, .option, .shift], voiceOverOn: true))
+        XCTAssertTrue(ControlAltStandIn.applies(modifiers: [.command, .option, .function, .numericPad], voiceOverOn: true), "arrows carry more flags")
+        XCTAssertFalse(ControlAltStandIn.applies(modifiers: [.command, .option], voiceOverOn: false), "VoiceOver off: Control-Option gets through by itself")
+        XCTAssertFalse(ControlAltStandIn.applies(modifiers: [.command], voiceOverOn: true), "the Windows key alone")
+        XCTAssertFalse(ControlAltStandIn.applies(modifiers: [.command, .control], voiceOverOn: true), "the way back")
+        XCTAssertFalse(ControlAltStandIn.applies(modifiers: [.command, .control, .option], voiceOverOn: true))
+        typealias Step = ControlAltStandIn.Step
+        let windowsKey: Int32 = 0x100 | 0x5B, right: Int32 = 0x100 | 0x4D
+        // The first key: Control goes down before the Windows key comes up, or Windows opens the Start menu.
+        XCTAssertEqual(ControlAltStandIn.steps(key: right, windowsKeyDown: windowsKey),
+                       [Step(press: true, code: 0x1D), Step(press: false, code: windowsKey), Step(press: true, code: right), Step(press: false, code: right), Step(press: false, code: 0x1D)])
+        // The next, with Command still held on the Mac: the Windows key is already up in the machine.
+        XCTAssertEqual(ControlAltStandIn.steps(key: right, windowsKeyDown: nil),
+                       [Step(press: true, code: 0x1D), Step(press: true, code: right), Step(press: false, code: right), Step(press: false, code: 0x1D)])
+        XCTAssertTrue(ControlAltStandIn.hint.contains("Command-Option") && ControlAltStandIn.hint.contains("Command-F5"))
+    }
+
     func testMacSpacesShortcuts() {
         func entry(enabled: Int, key: Int? = nil, modifiers: Int = 8650752) -> [String: Any] {
             var e: [String: Any] = ["enabled": NSNumber(value: enabled)]

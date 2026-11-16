@@ -1240,7 +1240,7 @@ enum MacVoiceOver {
     /// for Command-F5), remembering to bring it back on the way out.
     static func noteEnteringGuest() -> Bool {
         let on = NSWorkspace.shared.isVoiceOverEnabled
-        AVMLog.write("Guest House: MacVoiceOver — \(on ? "on" : "off") on entering macOS.")
+        AVMLog.write("Guest House: MacVoiceOver — \(on ? "on" : "off") as the keyboard goes into a machine.")
         if on { bringBack = true }
         return on
     }
@@ -1262,7 +1262,7 @@ enum MacVoiceOver {
         guard bringBack else { return }
         if NSWorkspace.shared.isVoiceOverEnabled {
             bringBack = false
-            AVMLog.write("Guest House: MacVoiceOver — still on on leaving macOS.")
+            AVMLog.write("Guest House: MacVoiceOver — still on as the keyboard comes back.")
             return
         }
         let app = URL(fileURLWithPath: "/System/Library/CoreServices/VoiceOver.app")

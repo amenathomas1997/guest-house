@@ -130,7 +130,7 @@ enum SaveResumeTestJob {
     static let flag = "--test-save-resume"
 
     static func runIfAsked(arguments: [String] = CommandLine.arguments) {
-        guard arguments.contains(flag) || arguments.contains("--test-microphone") || arguments.contains("--test-two-machines") || arguments.contains("--test-stress") || arguments.contains("--test-blue-screen") || arguments.contains("--test-machine-drives") || arguments.contains("--test-install-apps") || arguments.contains("--test-keyboard-layout")
+        guard arguments.contains(flag) || arguments.contains("--test-microphone") || arguments.contains("--test-two-machines") || arguments.contains("--test-stress") || arguments.contains("--test-blue-screen") || arguments.contains("--test-machine-drives") || arguments.contains("--test-install-apps") || arguments.contains("--test-keyboard-layout") || arguments.contains("--test-control-alt")
                 || arguments.contains("--test-duplicate") || arguments.contains("--test-send-file")
                 || arguments.contains("--test-linux-share") || arguments.contains("--test-ctl")
                 || arguments.contains("--test-disk-info") || arguments.contains("--run-in-guest")
@@ -206,6 +206,9 @@ enum SaveResumeTestJob {
             let folderURL = URL(fileURLWithPath: folder, isDirectory: true)
             if arguments.contains("--test-keyboard-layout") {
                 await finish(await keyboardLayout(folderURL, guest))
+            }
+            if arguments.contains("--test-control-alt") {
+                await finish(await controlAlt(folderURL))
             }
             if arguments.contains("--test-install-apps") {
                 await finish(guest == .windows ? await installApps(folderURL) : await installLinuxApps(folderURL, guest))
@@ -1790,6 +1793,116 @@ enum SaveResumeTestJob {
         MachineDisplays.placeOpening(window, for: config)
         check("one that isn't connected leaves the window be", window.frame == before && MachineDisplays.chosenScreen(config) == nil)
         check("and isn't moved to when the monitors change", !MachineDisplays.displaysChanged(window, for: config))
+        return ok
+    }
+
+    /// --test-control-alt (2026-11-16, ControlAltStandIn): the keys Guest House
+    /// sends for Command-Option with VoiceOver on, in the order it sends
+    /// them, into a real Windows: Alt down and the Windows key down (as the
+    /// person holds Option and Command), then Control down, the Windows key
+    /// up, the key, Control up, Alt up. Windows must act on Control-Alt-J (a
+    /// desktop shortcut with that hot key leaves a file) and must not open
+    /// the Start menu. Then the same without Control going down first, to
+    /// show the Start menu is what that order prevents.
+    private static func controlAlt(_ folder: URL) async -> Bool {
+        let manager = VMManager()
+        guard await start(manager, configuration(folder: folder, guest: .windows)),
+              let agent = manager.guestAgentSocketPath, await waitForAgent(agent, seconds: 300) else {
+            check("the machine started and answers", false); await shutDown(manager); return false
+        }
+        func powershell(_ script: String) async -> String {
+            await exec(agent, program: "powershell.exe", args: ["-NoProfile", "-Command", script]) ?? ""
+        }
+        // The desktop, signed in (the same way the pinned apps test signs in).
+        var tasks = await exec(agent, program: "tasklist.exe", args: ["/fo", "csv", "/nh"]) ?? ""
+        if !tasks.lowercased().contains("explorer.exe") {
+            let password = "T" + UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(16).lowercased() + "x1"
+            _ = await exec(agent, program: "net.exe", args: ["user", "avmtest", password])
+            for _ in 0..<6 where !tasks.lowercased().contains("explorer.exe") {
+                try? await Task.sleep(for: .seconds(30))
+                _ = try? await manager.sendQMPCommand("send-key", arguments: ["keys": [["type": "qcode", "data": "spc"]]])
+                try? await Task.sleep(for: .seconds(4))
+                _ = await manager.typeText(password + "\n")
+                try? await Task.sleep(for: .seconds(30))
+                tasks = await exec(agent, program: "tasklist.exe", args: ["/fo", "csv", "/nh"]) ?? ""
+            }
+        }
+        var user = ""
+        for _ in 0..<40 {
+            user = await powershell("$u = (Get-CimInstance Win32_ComputerSystem).UserName; if ($u -and (Get-Process explorer -ErrorAction SilentlyContinue)) { $u.Split('\\')[-1] }").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !user.isEmpty { break }
+            try? await Task.sleep(for: .seconds(5))
+        }
+        check("someone is signed in at the desktop", !user.isEmpty)
+        guard !user.isEmpty else { await shutDown(manager); return false }
+        let marker = #"C:\Users\Public\avm-control-alt.txt"#
+        // A listener in the signed-in session that asks Windows for exactly
+        // Control-Alt-J (RegisterHotKey: it fires only when no other modifier
+        // is held) and writes the file. A shortcut's hot key, tried first,
+        // never fired when the shortcut was made from outside the session.
+        let listener = #"""
+            Add-Type -Namespace W -Name H -MemberDefinition '[DllImport("user32.dll")] public static extern bool RegisterHotKey(IntPtr h, int id, uint m, uint vk); [DllImport("user32.dll")] public static extern int GetMessage(out MSG m, IntPtr h, uint a, uint b); [StructLayout(LayoutKind.Sequential)] public struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam; public IntPtr lParam; public uint time; public int x; public int y; }'
+            if ([W.H]::RegisterHotKey([IntPtr]::Zero, 1, 3, 0x4A)) { Set-Content 'C:\Users\Public\avm-control-alt-ready.txt' 'ready' }
+            $m = New-Object 'W.H+MSG'
+            while ([W.H]::GetMessage([ref]$m, [IntPtr]::Zero, 0, 0) -gt 0) { if ($m.message -eq 0x312) { Set-Content 'C:\Users\Public\avm-control-alt.txt' 'hit' } }
+            """#
+        let packed = Data(listener.utf8).base64EncodedString()
+        _ = await powershell("Remove-Item -Force -ErrorAction SilentlyContinue '\(marker)','C:\\Users\\Public\\avm-control-alt-ready.txt'; [IO.File]::WriteAllBytes('C:\\Users\\Public\\avm-control-alt.ps1', [Convert]::FromBase64String('\(packed)'))")
+        _ = await exec(agent, program: "schtasks.exe", args: ["/create", "/f", "/tn", "AVMControlAltTest", "/sc", "once", "/st", "00:00", "/ru", user, "/it",
+                                                               "/tr", "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\\Users\\Public\\avm-control-alt.ps1"])
+        _ = await exec(agent, program: "schtasks.exe", args: ["/run", "/tn", "AVMControlAltTest"])
+        var ready = false
+        for _ in 0..<20 where !ready {
+            try? await Task.sleep(for: .seconds(3))
+            ready = (await powershell("Test-Path 'C:\\Users\\Public\\avm-control-alt-ready.txt'")).contains("True")
+        }
+        check("a listener in the session has Control-Alt-J", ready)
+        guard ready else { await shutDown(manager); return false }
+        func key(_ name: String, _ down: Bool) async {
+            _ = try? await manager.sendQMPCommand("input-send-event", arguments: ["events": [["type": "key", "data": ["down": down, "key": ["type": "qcode", "data": name]]]]])
+            try? await Task.sleep(for: .milliseconds(60))
+        }
+        func startMenuShowing() async -> Bool {
+            try? await Task.sleep(for: .seconds(3))
+            let text = (await manager.readScreenText() ?? "").lowercased()
+            return text.contains("pinned") || text.contains("recommended") || text.contains("search for apps")
+        }
+        func shortcutRan() async -> Bool {
+            try? await Task.sleep(for: .seconds(5))
+            let hit = await powershell("if (Test-Path '\(marker)') { 'HIT' } else { 'no file' }")
+            _ = await powershell("Remove-Item -Force -ErrorAction SilentlyContinue '\(marker)'")
+            return hit.contains("HIT")
+        }
+        // Plain Control-Alt-J first: is the shortcut live at all?
+        var live = false
+        for _ in 0..<6 where !live {
+            await key("ctrl", true); await key("alt", true); await key("j", true); await key("j", false); await key("alt", false); await key("ctrl", false)
+            live = await shortcutRan()
+            if !live { try? await Task.sleep(for: .seconds(10)) }
+        }
+        check("a plain Control-Alt-J reaches the listener", live)
+        guard live else { await shutDown(manager); return false }
+        print("== Command-Option-J as Guest House sends it with VoiceOver on")
+        let before = await startMenuShowing()
+        await key("alt", true); await key("meta_l", true)
+        await key("ctrl", true); await key("meta_l", false); await key("j", true); await key("j", false); await key("ctrl", false)
+        await key("alt", false)
+        let opened = await startMenuShowing()
+        let hit = await shortcutRan()
+        print("   Start menu before: \(before ? "showing" : "not showing"); after: \(opened ? "showing" : "not showing"); the shortcut: \(hit ? "ran" : "didn't run")")
+        check("Windows acted on Control-Alt-J", hit)
+        check("the Start menu didn't open", !opened)
+        // The same without Control first: what the order is for.
+        print("== For comparison: the Windows key let go with nothing pressed since")
+        await key("meta_l", true); await key("meta_l", false)
+        let naive = await startMenuShowing()
+        print("   Start menu after a bare Windows key: \(naive ? "showing" : "not showing") (showing is what the test can tell apart)")
+        if naive { await key("esc", true); await key("esc", false) }
+        check("the test can see the Start menu when it does open", naive)
+        _ = await exec(agent, program: "schtasks.exe", args: ["/end", "/tn", "AVMControlAltTest"])
+        _ = await exec(agent, program: "schtasks.exe", args: ["/delete", "/f", "/tn", "AVMControlAltTest"])
+        _ = await powershell("Remove-Item -Force -ErrorAction SilentlyContinue 'C:\\Users\\Public\\avm-control-alt.ps1','C:\\Users\\Public\\avm-control-alt-ready.txt','\(marker)'")
+        await shutDown(manager)
         return ok
     }
 

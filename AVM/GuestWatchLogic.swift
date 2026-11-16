@@ -304,6 +304,49 @@ nonisolated struct MachineCheckResult: Sendable {
     }
 }
 
+/// Command-Option in place of Control-Option, while the Mac's VoiceOver is on
+/// (2026-11-16, the user's report: Control-Option with the arrows didn't
+/// reach Windows until VoiceOver was turned off). Control-Option is
+/// VoiceOver's own pair of keys, so VoiceOver takes them before any app sees
+/// them, and in Windows and Linux the same two keys are Control-Alt: table
+/// navigation in NVDA and JAWS, Control-Alt-N to start NVDA, Control-Alt-T
+/// in Linux. Command-Option is one key to the right, VoiceOver leaves it
+/// alone, and what it is in Windows (the Windows key with Alt) is hardly
+/// used. So with VoiceOver on, Guest House turns it into Control-Alt.
+/// With VoiceOver off nothing changes: Control-Option reaches the machine
+/// by itself, and Command-Option stays the Windows key with Alt.
+nonisolated enum ControlAltStandIn {
+    static let control: Int32 = 0x1D
+
+    /// Command and Option, with or without Shift, and VoiceOver on.
+    static func applies(modifiers: NSEvent.ModifierFlags, voiceOverOn: Bool) -> Bool {
+        let held = modifiers.intersection([.control, .command, .option, .shift])
+        return voiceOverOn && (held == [.command, .option] || held == [.command, .option, .shift])
+    }
+
+    struct Step: Equatable, Sendable {
+        let press: Bool
+        let code: Int32
+    }
+
+    /// The machine already has Alt down (Option was sent as it was pressed)
+    /// and, the first time, the Windows key (Command). Control goes down
+    /// BEFORE the Windows key comes up: a Windows key let go with no other
+    /// key pressed since it went down opens the Start menu, and Control is
+    /// that other key. Then the key itself, then Control up. Alt is let go
+    /// when the person lets go of Option, after other keys, so Windows
+    /// doesn't take it for Alt alone either. `windowsKeyDown` is the
+    /// Windows key's code while the machine still has it down.
+    static func steps(key: Int32, windowsKeyDown: Int32?) -> [Step] {
+        var steps = [Step(press: true, code: control)]
+        if let windowsKey = windowsKeyDown { steps.append(Step(press: false, code: windowsKey)) }
+        steps += [Step(press: true, code: key), Step(press: false, code: key), Step(press: false, code: control)]
+        return steps
+    }
+
+    static let hint = "With your Mac's VoiceOver on, hold Command-Option where Windows or Linux wants Control-Alt, since VoiceOver keeps Control-Option for itself. Or press Command-F5 to turn VoiceOver off; Guest House turns it back on when you return to the Mac."
+}
+
 /// Control keys the Mac itself takes before any app sees them (2026-11-16):
 /// its own shortcuts for Mission Control, Spaces and input sources. These
 /// never arrive at Guest House at all. With Accessibility allowed, Guest House

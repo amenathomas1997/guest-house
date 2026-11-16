@@ -1682,9 +1682,29 @@ final class SPICECoordinator: NSObject, CSConnectionDelegate {
         if KeyEventLogging.isEnabled {
             NSLog("Guest House: combo key vk=\(vk) -> scancode=0x\(String(scancode, radix: 16)) tap (press+release)")
         }
+        // COMMAND-OPTION AS CONTROL-ALT, WITH VOICEOVER ON (2026-11-16): see
+        // ControlAltStandIn. The Windows key the machine has down is let go
+        // inside the sequence, and stays up until Command is pressed again.
+        if ControlAltStandIn.applies(modifiers: event.modifierFlags, voiceOverOn: NSWorkspace.shared.isVoiceOverEnabled) {
+            for step in ControlAltStandIn.steps(key: code, windowsKeyDown: windowsKeyDownInGuest) {
+                input.send(step.press ? .press : .release, code: step.code)
+            }
+            if windowsKeyDownInGuest != nil {
+                windowsKeyDownInGuest = nil
+                windowsKeyLetGoForControlAlt = true
+            }
+            return
+        }
         input.send(.press, code: code)
         input.send(.release, code: code)
     }
+
+    /// The Windows key (Command) as the machine has it: its code while down.
+    private var windowsKeyDownInGuest: Int32?
+    /// True once ControlAltStandIn has let it go while Command is still held
+    /// on the Mac: its release, when Command comes up, isn't sent again.
+    private var windowsKeyLetGoForControlAlt = false
+
     /// Presses that reached handleKey, for --test-control-keys.
     nonisolated(unsafe) static var pressesSeenForTest = 0
 
@@ -1852,7 +1872,23 @@ final class SPICECoordinator: NSObject, CSConnectionDelegate {
             if KeyEventLogging.isEnabled {
                 NSLog("Guest House: modifier vk=\(vk) -> scancode=0x\(String(scancode, radix: 16)) down=\(isDown)")
             }
-            input.send(isDown ? .press : .release, code: Int32(scancode))
+            // The Windows key's own state (2026-11-16, ControlAltStandIn):
+            // let go already inside a Command-Option sequence, its release
+            // isn't sent a second time.
+            if vk == kVK_Command || vk == kVK_RightCommand {
+                if isDown {
+                    windowsKeyDownInGuest = Int32(scancode)
+                    windowsKeyLetGoForControlAlt = false
+                    input.send(.press, code: Int32(scancode))
+                } else if windowsKeyLetGoForControlAlt {
+                    windowsKeyLetGoForControlAlt = false
+                } else {
+                    windowsKeyDownInGuest = nil
+                    input.send(.release, code: Int32(scancode))
+                }
+            } else {
+                input.send(isDown ? .press : .release, code: Int32(scancode))
+            }
         }
 
         // STUCK-KEY FLUSH: if the modifier set is shrinking (a key combination is being

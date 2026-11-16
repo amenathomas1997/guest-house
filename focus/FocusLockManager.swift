@@ -256,6 +256,7 @@ class FocusLockManager: ObservableObject {
     /// or switched users (fifth audit).
     private var droppedBySystem: String?
     private var toldHowToLeave = false
+    private var toldAboutVoiceOverKeys = false
     /// When Guest House last stopped being the active app while locked, and in
     /// which machine (sixth audit): a screen saver that starts first, then
     /// locks the screen, unlocked through that path.
@@ -409,7 +410,18 @@ class FocusLockManager: ObservableObject {
         // said it, and nothing read that.
         let wayOut = toldHowToLeave ? "" : ". Control-Command-Escape returns to your Mac."
         toldHowToLeave = true
-        Announcer.shared.announce("Entering \(guestName)\(wayOut)", tone: .enterGuest)
+        // THE MAC'S VOICEOVER (2026-11-16, the user's report): on, it keeps
+        // Control-Option, which is Control-Alt in the machine. Said the
+        // first time in a run; and whether it was on is remembered, so if
+        // the person turns it off with Command-F5 while in the machine,
+        // unlock() turns it back on, as macOS machines already had it.
+        let voiceOverOn = MacVoiceOver.noteEnteringGuest()
+        var enteringWords = "Entering \(guestName)\(wayOut)"
+        if voiceOverOn, !toldAboutVoiceOverKeys {
+            toldAboutVoiceOverKeys = true
+            enteringWords += (enteringWords.hasSuffix(".") ? " " : ". ") + ControlAltStandIn.hint
+        }
+        Announcer.shared.announce(enteringWords, tone: .enterGuest)
         AVMLog.write("Guest House: FocusLock.lock() — NOW LOCKED (isLocked=true).")
     }
 
@@ -443,6 +455,9 @@ class FocusLockManager: ObservableObject {
         // Caps Lock back to normal Mac behavior BEFORE the transition
         // announcement, for the same queue-flush reason as lock().
         CapsLockRemapper.shared.restoreForUnlock()
+        // The Mac's VoiceOver back on, if it was on when the keyboard went
+        // in and has been turned off since (2026-11-16).
+        MacVoiceOver.restoreAfterGuest()
         Announcer.shared.announce("Entering Mac", tone: .leaveGuest)
         AVMLog.write("Guest House: FocusLock.unlock() — NOW UNLOCKED (isLocked=false).")
         NotificationCenter.default.post(name: Self.didUnlock, object: nil)
