@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.55</title>
+            <sparkle:version>75</sparkle:version>
+            <sparkle:shortVersionString>0.4.55</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>New: Export for UTM. UTM is another free virtual machine app for the Mac. Shut a Windows or Linux machine down, then choose Export for UTM in the Virtual Machine menu, or Export for UTM in the machine&#x27;s actions menu, and choose where to save it. Guest House saves a copy ending in .utm and says how it is going and when it is done.</li><li>To use the copy, open UTM, choose File, then Open, and choose it. UTM runs the machine from where you saved it, so save it somewhere it can stay.</li><li>The copy has the machine&#x27;s disk, its firmware settings and the same virtual hardware, and a Windows machine keeps the contents of its security chip, the TPM. Restore points and Guest House&#x27;s own settings for the machine, such as its shared folder and Remote Desktop, don&#x27;t go with it. Your machine in Guest House isn&#x27;t changed. macOS machines can&#x27;t be exported for UTM.</li><li>This is new. A Windows 11 and a Debian machine exported this way both opened and started in UTM 5. I&#x27;d like to hear how it goes with your machines.</li></ul>]]></description>
+            <pubDate>Wed, 18 Nov 2026 04:55:14 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.55/GuestHouse-0.4.55.zip" sparkle:edSignature="xABcHHXJ/hkRwYllgTTfRB/SlwCgUnsKr+xXOrJAvOJbMK6GsM8e/utV9Geve7xz69xPAg/jznqIFoL/jfRZDg==" length="106821062" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.54</title>
             <sparkle:version>74</sparkle:version>
             <sparkle:shortVersionString>0.4.54</sparkle:shortVersionString>
