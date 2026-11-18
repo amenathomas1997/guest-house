@@ -260,6 +260,9 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.56", changes: [
+            "Fixed: Windows apps had stopped appearing in Command-Tab and the Dock. Guest House keeps a small helper in Windows that lists the open apps. A security step that tightens the permissions on the helper's folder left a helper that was already there with no permissions at all, so Guest House could no longer update it or start it. It showed on any Windows machine set up before early November. The machine mends itself the first time it starts with this version; give it a minute after you sign in to Windows.",
+        ]),
         ReleaseNote(version: "0.4.55", changes: [
             "New: Export for UTM. UTM is another free virtual machine app for the Mac. Shut a Windows or Linux machine down, then choose Export for UTM in the Virtual Machine menu, or Export for UTM in the machine's actions menu, and choose where to save it. Guest House saves a copy ending in .utm and says how it is going and when it is done.",
             "To use the copy, open UTM, choose File, then Open, and choose it. UTM runs the machine from where you saved it, so save it somewhere it can stay.",

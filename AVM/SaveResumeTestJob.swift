@@ -1392,6 +1392,18 @@ enum SaveResumeTestJob {
         check("the helper compiled and installed", await WindowsApps.shared.ensureHelper(manager, machine: config.id))
         let version = (try? await WindowsApps.readGuestFile(manager, root + #"\bin\version.txt"#)) ?? nil
         check("it's version \(WindowsApps.helperVersion) (\(version ?? "none"))", version?.trimmingCharacters(in: .whitespacesAndNewlines) == WindowsApps.helperVersion)
+        // The lockdown over a helper that's already there, as screen reader
+        // setup and every helper update run it (2026-11-18: it left the
+        // helper's files with no access at all, and the next update failed
+        // with "Access is denied"). Then an update, by an old version number.
+        _ = try? await manager.agentRun("powershell.exe", ["-NoProfile", "-Command", WindowsApps.lockDownScript], limit: .seconds(60))
+        let relocked = (try? await WindowsApps.readGuestFile(manager, root + #"\bin\version.txt"#)) ?? nil
+        check("the helper's files can still be read after the lockdown runs again (\(relocked ?? "none"))", relocked?.trimmingCharacters(in: .whitespacesAndNewlines) == WindowsApps.helperVersion)
+        let madeOld: Bool = (try? await WindowsApps.writeGuestFile(manager, root + #"\bin\version.txt"#, "0\n")) != nil
+        check("an older version number can be written", madeOld)
+        check("the helper installs over one that's already there", await WindowsApps.shared.ensureHelper(manager, machine: config.id))
+        let again = (try? await WindowsApps.readGuestFile(manager, root + #"\bin\version.txt"#)) ?? nil
+        check("and is version \(WindowsApps.helperVersion) again (\(again ?? "none"))", again?.trimmingCharacters(in: .whitespacesAndNewlines) == WindowsApps.helperVersion)
         var running = false
         for _ in 0..<40 where !running {
             try? await Task.sleep(for: .seconds(3))

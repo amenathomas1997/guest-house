@@ -884,6 +884,14 @@ final class WindowsApps {
     /// and own it, so a standard user who made Guest House's first could swap what
     /// SYSTEM then ran from it, or plant a DLL beside the helper. Applied to
     /// everything inside too, before the one folder Users may write to.
+    /// Inside, by inheriting and nothing else (2026-11-18): the folder's own
+    /// rule used to be written onto every file with /t, and on a file
+    /// icacls dropped the inherited entries and added none, so a helper
+    /// already there was left with no access for anyone, SYSTEM included.
+    /// Guest House could then neither read version.txt nor write the new
+    /// helper ("Access is denied"), and had stopped the old one first, so
+    /// the Command-Tab list was gone until the files were made again. The
+    /// reset mends files left that way, which SYSTEM still owns.
     /// That folder's own files get their write access back (2026-11-07):
     /// the reset reached them too and took it, and an existing running.txt
     /// could no longer be replaced, so the Command-Tab list stood still.
@@ -922,7 +930,8 @@ final class WindowsApps {
           }
         }
         icacls $avm /setowner '*S-1-5-18' /t /l /c /q | Out-Null
-        icacls $avm /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' /t /l /c /q | Out-Null
+        icacls $avm /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-32-545:(OI)(CI)RX' /l /c /q | Out-Null
+        icacls "$avm\*" /reset /t /l /c /q | Out-Null
         if (Test-Path "$avm\apps") {
           icacls "$avm\apps" /grant '*S-1-5-32-545:(OI)(CI)M' /l /c /q | Out-Null
           Get-ChildItem "$avm\apps" -File -Force -ErrorAction SilentlyContinue | Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } | ForEach-Object { icacls $_.FullName /grant '*S-1-5-32-545:M' /l /c /q | Out-Null }
