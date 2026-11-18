@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.56</title>
+            <sparkle:version>76</sparkle:version>
+            <sparkle:shortVersionString>0.4.56</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>Fixed: Windows apps had stopped appearing in Command-Tab and the Dock. Guest House keeps a small helper in Windows that lists the open apps. A security step that tightens the permissions on the helper&#x27;s folder left a helper that was already there with no permissions at all, so Guest House could no longer update it or start it. It showed on any Windows machine set up before early November. The machine mends itself the first time it starts with this version; give it a minute after you sign in to Windows.</li></ul>]]></description>
+            <pubDate>Wed, 18 Nov 2026 17:54:05 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.56/GuestHouse-0.4.56.zip" sparkle:edSignature="ipCF7drgouDZo+2VH/w2DiuUxxDfMnydixDmdjyobybBHLg9D74A3fNVLO2LmpCO56eskVbsT4wzP3YEQ6c7BA==" length="106822087" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.55</title>
             <sparkle:version>75</sparkle:version>
             <sparkle:shortVersionString>0.4.55</sparkle:shortVersionString>
