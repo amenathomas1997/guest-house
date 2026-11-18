@@ -652,6 +652,27 @@ struct AVMApp: App {
                     .disabled(vmStore.configurations.isEmpty)
                 }
 
+                // Export for UTM (2026-11-17): Windows and Linux machines
+                // only; UTMExport.swift says what goes and what doesn't.
+                let forUTM = vmStore.configurations.filter { $0.guestOS != .macOS }
+                if forUTM.count > 1 {
+                    Menu("Export for UTM") {
+                        ForEach(forUTM) { config in
+                            Button("\(config.name)…") {
+                                AVMLog.write("Guest House: Export for UTM submenu — posting request for '\(config.name)' to ContentView.")
+                                DashboardCommand.post(.avmExportForUTMFromMenu, object: config.id)
+                            }
+                        }
+                    }
+                } else {
+                    Button("Export for UTM…") {
+                        guard let config = forUTM.first else { return }
+                        AVMLog.write("Guest House: Export for UTM menu — posting request for '\(config.name)' to ContentView.")
+                        DashboardCommand.post(.avmExportForUTMFromMenu, object: config.id)
+                    }
+                    .disabled(forUTM.isEmpty)
+                }
+
                 Button("Import Virtual Machine…") {
                     AVMLog.write("Guest House: Import Virtual Machine menu — posting import request to ContentView.")
                     DashboardCommand.post(.avmImportVMFromMenu, object: nil)

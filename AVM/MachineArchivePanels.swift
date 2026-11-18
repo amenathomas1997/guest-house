@@ -178,6 +178,147 @@ final class MachineArchiveController: ObservableObject {
         }
     }
 
+    // MARK: - Export for UTM (2026-11-17, UTMExport.swift)
+
+    /// A copy of a Windows or Linux machine that UTM opens: asks where,
+    /// then writes "<Name>.utm" there, speaking how it goes. The machine
+    /// itself isn't changed. `folder` and `done` are the test job's: no
+    /// panel, and the result handed back.
+    func exportForUTM(_ config: VMConfiguration, isRunning: Bool, into folder: URL? = nil, done: ((Bool) -> Void)? = nil) {
+        UsageCounts.note(.exportImport)   // fork-only-line
+        let name = config.name
+        func refuse(_ words: String, log: String) {
+            self.refuse(words, log: log)
+            done?(false)
+        }
+        if let activity {
+            refuse("Guest House is already \(activity). Next: try again when it's done.", log: "another copy is running")
+            return
+        }
+        if let problem = UTMExport.problem(for: config) {
+            refuse("\(problem) Nothing was exported.", log: "'\(name)' can't go to UTM")
+            return
+        }
+        if isRunning || Self.isRunningNow(config) {
+            refuse("\(name) is running. Next: shut it down, then export it for UTM.", log: "'\(name)' is running")
+            return
+        }
+        let dir: URL
+        do {
+            dir = try config.directoryURL()
+        } catch {
+            refuse("Guest House can't find \(name)'s folder. Reason: \(error.localizedDescription)", log: "no folder for '\(name)'")
+            return
+        }
+        if let problem = MachineArchive.exportProblemNow(for: config, vmDirectory: dir) {
+            refuse("\(problem) Nothing was exported.", log: "'\(name)' can't be exported now")
+            return
+        }
+        let fm = FileManager.default
+        let store = dir.appendingPathComponent("nvram.fd")
+        guard fm.fileExists(atPath: store.path) else {
+            refuse("\(name) has never been started, so there is nothing for UTM to start from. Next: start it once, shut it down, then export it for UTM.", log: "'\(name)' has no variable store")
+            return
+        }
+        guard let resources = Bundle.main.resourceURL,
+              fm.isExecutableFile(atPath: resources.appendingPathComponent("qemu-img").path) else {
+            refuse("A tool Guest House needs for this, qemu-img, is missing from this copy of Guest House. Nothing was exported. Next: install Guest House again.", log: "qemu-img missing")
+            return
+        }
+        let swtpm = resources.appendingPathComponent("swtpm")
+
+        let packageName = UTMExport.packageName(for: config)
+        var package: URL
+        if let folder {
+            package = folder.appendingPathComponent(packageName, isDirectory: true)
+        } else {
+            let panel = NSSavePanel()
+            panel.title = "Export \(name) for UTM"
+            panel.message = "Choose where to save a copy of \(name) that UTM can open. Guest House saves it as \(packageName). UTM runs it from where you save it, so choose a place it can stay."
+            panel.prompt = "Export"
+            panel.nameFieldLabel = "Save As:"
+            panel.nameFieldStringValue = packageName
+            panel.canCreateDirectories = true
+            panel.isExtensionHidden = false
+            guard panel.runModal() == .OK, let chosen = panel.url else {
+                AVMLog.write("Guest House: UTM export — save panel cancelled for '\(name)'.")
+                return
+            }
+            package = chosen
+            if Self.isRunningNow(config) {
+                refuse("\(name) started while you chose where to save it, so it wasn't exported. Next: shut it down, then export it for UTM.", log: "'\(name)' started under the save panel")
+                return
+            }
+            if package.pathExtension.lowercased() != UTMExport.packageExtension {
+                package.appendPathExtension(UTMExport.packageExtension)
+                if fm.fileExists(atPath: package.path) {
+                    refuse("Something named \(package.lastPathComponent) is already there. Nothing was exported. Next: export again and choose another name.", log: "name taken")
+                    return
+                }
+            }
+        }
+        let parent = package.deletingLastPathComponent()
+        let place = MachineArchive.placeName(of: parent)
+        let dirPath = dir.standardizedFileURL.path
+        if parent.standardizedFileURL.path == dirPath || parent.standardizedFileURL.path.hasPrefix(dirPath + "/") {
+            refuse("That folder is inside \(name) itself. Nothing was exported. Next: choose another folder or drive.", log: "destination inside the machine")
+            return
+        }
+
+        var disks = [UTMExport.Job.Disk(source: dir.appendingPathComponent(MachineArchive.diskFileName(for: config)), imageName: "disk.qcow2")]
+        if config.secondDriveGB != nil, let second = RestorePoints.secondDrive(dir) {
+            disks.append(UTMExport.Job.Disk(source: second, imageName: VMConfiguration.secondDriveFileName))
+        }
+        let drives = disks.map { UTMExport.Drive(identifier: UUID().uuidString, imageName: $0.imageName) }
+        let settings: Data
+        do {
+            settings = try UTMExport.settingsData(for: config, drives: drives, appVersion: Self.appVersion)
+        } catch {
+            refuse("Guest House couldn't write \(name)'s settings for UTM, so nothing was exported. Reason: \(error.localizedDescription)", log: "settings failed for '\(name)'")
+            return
+        }
+        let wantsTPM = UTMExport.usesTPM(config)
+        let job = UTMExport.Job(disks: disks, variableStore: store,
+                                tpmState: wantsTPM ? dir.appendingPathComponent("tpm-state") : nil,
+                                settings: settings, qemuImg: resources.appendingPathComponent("qemu-img"),
+                                swtpm: fm.isExecutableFile(atPath: swtpm.path) ? swtpm : nil)
+        let needed = UTMExport.bytesNeeded(job)
+        if let free = MachineFileCopier.availableBytes(at: parent), free < needed + Self.spareBytes {
+            refuse("There isn't room for \(name) on \(place). It needs \(MachineArchive.spokenSize(needed)), and \(MachineArchive.spokenSize(free)) is free. Nothing was exported. Next: free some space, or choose another drive.", log: "not enough space for '\(name)' (\(needed) needed, \(free) free)")
+            return
+        }
+
+        begin("exporting \(name) for UTM", id: config.id)
+        let speaks = needed >= Self.speakProgressFrom
+        AVMLog.write("Guest House: UTM export — '\(name)' to \(place), \(disks.count) disk\(disks.count == 1 ? "" : "s"), \(needed) bytes needed, TPM \(wantsTPM ? "wanted" : "not wanted").")
+        Announcer.shared.announce("Exporting \(name) for UTM to \(place): up to \(MachineArchive.spokenSize(needed)). \(speaks ? "Guest House will say how it's going. " : "")Don't start \(name)\(place == "your Mac" ? "" : " or disconnect the drive") until it's done.", tone: .info)
+
+        let ticker = ProgressTicker(verb: "Exporting", name: name, speaks: speaks)
+        let isWindows = config.guestOS == .windows
+        Task { @MainActor in
+            let result = await Task.detached(priority: .userInitiated) { () throws -> UTMExport.Outcome in
+                try UTMExport.writePackage(job, to: package) { fraction in
+                    ticker.report(UInt64(fraction * 1000), of: 1000)
+                }
+            }.result
+            self.end()
+            switch result {
+            case .success(let outcome):
+                AVMLog.write("Guest House: UTM export — '\(name)' exported to \(place); TPM carried: \(outcome.tpmCarried.map { $0 ? "yes" : "no" } ?? "not wanted").")
+                var words = "\(name) is ready for UTM on \(place), as \(package.lastPathComponent). Next: in UTM, choose File, then Open, and choose it. UTM runs it from there, so leave it in place. \(name) is still in Guest House, unchanged; its restore points and Guest House's own settings didn't go with the copy."
+                if outcome.tpmCarried == false, isWindows {
+                    words += " One thing didn't go: the contents of its security chip, the TPM. In UTM, Windows may ask you to set up your PIN again, and if its drive is encrypted with BitLocker it will ask for the recovery key."
+                }
+                Announcer.shared.announce(words, tone: .success)
+                done?(true)
+            case .failure(let error):
+                AVMLog.write("Guest House: UTM export — FAILED for '\(name)': \(error.localizedDescription)")
+                Announcer.shared.announce("Exporting \(name) for UTM failed, and nothing half-written was left on \(place). \(name) itself is untouched. Reason: \(error.localizedDescription) Next: check the drive is connected and has room, then try again.", tone: .failure)
+                done?(false)
+            }
+        }
+    }
+
     // MARK: - Automatic backup (2026-11-01, MachineBackups.swift)
 
     /// One backup, with no questions; true when it's done. A machine that's

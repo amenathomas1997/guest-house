@@ -48,6 +48,8 @@ extension Notification.Name {
     /// running is known here (the active session) and the list is vmStore.
     static let avmExportVMFromMenu = Notification.Name("avmExportVMFromMenu")
     static let avmImportVMFromMenu = Notification.Name("avmImportVMFromMenu")
+    /// Export for UTM (2026-11-17): the machine's ID, as Export.
+    static let avmExportForUTMFromMenu = Notification.Name("avmExportForUTMFromMenu")
 }
 
 /// One open of the USB picker sheet: which mode, which devices. Identity
@@ -324,6 +326,15 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .avmImportVMFromMenu)) { _ in
             MachineArchiveController.shared.importMachine(into: vmStore)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .avmExportForUTMFromMenu)) { note in
+            guard let id = note.object as? UUID,
+                  let config = vmStore.configurations.first(where: { $0.id == id }) else {
+                Announcer.shared.announce("That virtual machine is no longer in your list. Nothing was exported.", tone: .failure)
+                return
+            }
+            let running = machines.session(for: id) != nil || MacGuestRunner.shared.runningID == id
+            MachineArchiveController.shared.exportForUTM(config, isRunning: running)
         }
     }
 
@@ -671,6 +682,9 @@ private struct DashboardContent: View {
                 MachineArchiveController.shared.duplicate(config, isRunning: false, into: vmStore)
             })
             items.append(MachineMenuItem("Export \(config.name)…") { MachineArchiveController.shared.export(config, isRunning: false) })
+            if config.guestOS != .macOS {
+                items.append(MachineMenuItem("Export \(config.name) for UTM…") { MachineArchiveController.shared.exportForUTM(config, isRunning: false) })
+            }
             items.append(.separator)
             items.append(MachineMenuItem("Delete \(config.name)…") { confirmDelete(config: config) })
         }

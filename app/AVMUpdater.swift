@@ -260,6 +260,12 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.55", changes: [
+            "New: Export for UTM. UTM is another free virtual machine app for the Mac. Shut a Windows or Linux machine down, then choose Export for UTM in the Virtual Machine menu, or Export for UTM in the machine's actions menu, and choose where to save it. Guest House saves a copy ending in .utm and says how it is going and when it is done.",
+            "To use the copy, open UTM, choose File, then Open, and choose it. UTM runs the machine from where you saved it, so save it somewhere it can stay.",
+            "The copy has the machine's disk, its firmware settings and the same virtual hardware, and a Windows machine keeps the contents of its security chip, the TPM. Restore points and Guest House's own settings for the machine, such as its shared folder and Remote Desktop, don't go with it. Your machine in Guest House isn't changed. macOS machines can't be exported for UTM.",
+            "This is new. A Windows 11 and a Debian machine exported this way both opened and started in UTM 5. I'd like to hear how it goes with your machines.",
+        ]),
         ReleaseNote(version: "0.4.54", changes: [
             "Command-Option for Control-Alt, new in 0.4.53, is confirmed working: with your Mac's VoiceOver on, Command-Option with the arrows reaches Windows as Control-Alt with the arrows. Add Shift for Control-Alt-Shift.",
             "It is easier to find out about. The notice when your keyboard goes into a machine with VoiceOver on is clearer and gives an example. Settings, under Keyboard, has a new part, Control-Alt Keys with VoiceOver On. And the Help menu has a new item of the same name that speaks a short reminder.",

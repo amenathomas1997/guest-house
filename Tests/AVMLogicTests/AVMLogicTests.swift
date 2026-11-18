@@ -3082,3 +3082,68 @@ final class HelperVersionTests: XCTestCase {
         XCTAssertEqual(WindowsEdition.imageName(for: "Windows 11 Pro", among: [("Windows 11 Pro", nil)]), "Windows 11 Pro", "a disc with no ids still matches by name")
     }
 }
+
+// MARK: - Export for UTM (2026-11-17)
+
+final class UTMExportTests: XCTestCase {
+    private func settings(_ change: (inout VMConfiguration) -> Void) -> [String: Any] {
+        var config = VMConfiguration(name: "Work PC", cpuCount: 6, ramSizeGB: 8, diskSizeGB: 64, diskImagePath: "/tmp/x/disk.qcow2")
+        change(&config)
+        return UTMExport.settings(for: config, drives: [.init(identifier: "A", imageName: "disk.qcow2")], appVersion: "0.4.55")
+    }
+
+    func testAWindowsMachineKeepsItsHardwareAndGetsATPM() throws {
+        var id = UUID()
+        let made = settings { $0.diskBus = "virtio"; id = $0.id }
+        XCTAssertEqual(made["Backend"] as? String, "QEMU")
+        XCTAssertEqual(made["ConfigurationVersion"] as? Int, 4)
+        let system = try XCTUnwrap(made["System"] as? [String: Any])
+        XCTAssertEqual(system["Architecture"] as? String, "aarch64")
+        XCTAssertEqual(system["CPUCount"] as? Int, 6)
+        XCTAssertEqual(system["MemorySize"] as? Int, 8192, "UTM counts memory in megabytes")
+        let qemu = try XCTUnwrap(made["QEMU"] as? [String: Any])
+        XCTAssertEqual(qemu["TPMDevice"] as? Bool, true, "Windows 11 keeps its TPM")
+        XCTAssertEqual(qemu["RTCLocalTime"] as? Bool, true, "Windows keeps the clock in local time")
+        let extra = try XCTUnwrap(qemu["AdditionalArguments"] as? [String])
+        XCTAssertEqual(extra.first, "-smbios")
+        XCTAssertTrue(extra.last?.contains("serial=\(id.uuidString)") == true, "the identity Windows activation saw")
+        XCTAssertTrue(extra.last?.hasPrefix("\"") == true && extra.last?.hasSuffix("\"") == true, "in quotes, or UTM splits it at its spaces")
+        let info = try XCTUnwrap(made["Information"] as? [String: Any])
+        XCTAssertEqual(info["UUID"] as? String, id.uuidString)
+        XCTAssertEqual(info["Name"] as? String, "Work PC")
+        let drive = try XCTUnwrap((made["Drive"] as? [[String: Any]])?.first)
+        XCTAssertEqual(drive["Interface"] as? String, "VirtIO")
+        XCTAssertEqual(drive["ImageName"] as? String, "disk.qcow2")
+        // UTM's own reader refuses a file that isn't a property list.
+        XCTAssertNoThrow(try PropertyListSerialization.data(fromPropertyList: made, format: .xml, options: 0))
+    }
+
+    func testAnOlderMachineKeepsItsNVMeDisk() throws {
+        let drive = try XCTUnwrap((settings { $0.diskBus = nil }["Drive"] as? [[String: Any]])?.first)
+        XCTAssertEqual(drive["Interface"] as? String, "NVMe")
+    }
+
+    func testLinuxHasNoTPMUnlessItHasSecureBoot() throws {
+        let plain = try XCTUnwrap(settings { $0.guestOSName = "debian" }["QEMU"] as? [String: Any])
+        XCTAssertEqual(plain["TPMDevice"] as? Bool, false)
+        XCTAssertEqual(plain["RTCLocalTime"] as? Bool, false, "Linux keeps the clock in UTC")
+        // UTM boots its Secure Boot firmware exactly when there's a TPM.
+        let secure = try XCTUnwrap(settings { $0.guestOSName = "fedora"; $0.secureBoot = true }["QEMU"] as? [String: Any])
+        XCTAssertEqual(secure["TPMDevice"] as? Bool, true)
+    }
+
+    func testMacOSIsRefusedInWords() {
+        var config = VMConfiguration(name: "Mac")
+        config.guestOSName = "macOS"
+        XCTAssertTrue(UTMExport.problem(for: config)?.contains("macOS") == true)
+        XCTAssertNil(UTMExport.problem(for: VMConfiguration(name: "PC")))
+    }
+
+    func testNamesAndAddresses() {
+        XCTAssertEqual(UTMExport.packageName(for: VMConfiguration(name: "Work/PC: two")), "Work-PC- two.utm")
+        let id = UUID(uuidString: "FFEEDDCC-BBAA-4988-8766-554433221100")!
+        let address = UTMExport.macAddress(for: id)
+        XCTAssertEqual(address, "FE:EE:DD:22:11:00", "locally administered, one device, and the machine's own")
+        XCTAssertNotEqual(address, UTMExport.macAddress(for: UUID()))
+    }
+}

@@ -234,6 +234,28 @@ FAT drive a disk takes its full size; APFS or Mac OS Extended keeps it
 small. An imported macOS machine keeps its identity, so it is the same
 Mac to macOS as the original: run only one of them at a time.
 
+## Taking a machine to UTM
+
+Export for UTM…, in the Virtual Machine menu and in a machine's actions
+menu, saves a copy of a Windows or Linux machine that
+[UTM](https://mac.getutm.app) opens: a folder ending in .utm. Shut the
+machine down first, then choose where to save it. In UTM, choose File,
+then Open, and choose the folder; UTM runs it from where it is, so save
+it somewhere it can stay.
+
+The copy has the machine's disk (and its second drive), its firmware
+settings, and the same virtual hardware, so Windows and Linux start as
+they did in Guest House. A Windows machine also takes the contents of its
+security chip, the TPM, so a PIN keeps working; if that can't be copied,
+Guest House says so when the export ends, and Windows may then ask for your
+PIN to be set up again, or for a BitLocker recovery key if its drive is
+encrypted.
+
+Left behind: restore points, and everything that is Guest House's own, such
+as the shared folder you chose, Remote Desktop, the keyboard for Windows
+and the sound choices. The machine in Guest House isn't changed. macOS
+machines can't be exported for UTM.
+
 ## Secure Boot
 
 New Windows machines have Secure Boot, with Microsoft's keys, so Windows

@@ -130,7 +130,7 @@ enum SaveResumeTestJob {
     static let flag = "--test-save-resume"
 
     static func runIfAsked(arguments: [String] = CommandLine.arguments) {
-        guard arguments.contains(flag) || arguments.contains("--test-microphone") || arguments.contains("--test-two-machines") || arguments.contains("--test-stress") || arguments.contains("--test-blue-screen") || arguments.contains("--test-machine-drives") || arguments.contains("--test-install-apps") || arguments.contains("--test-keyboard-layout") || arguments.contains("--test-control-alt")
+        guard arguments.contains(flag) || arguments.contains("--test-microphone") || arguments.contains("--test-two-machines") || arguments.contains("--test-stress") || arguments.contains("--test-blue-screen") || arguments.contains("--test-machine-drives") || arguments.contains("--test-install-apps") || arguments.contains("--test-keyboard-layout") || arguments.contains("--test-control-alt") || arguments.contains("--test-utm-export")
                 || arguments.contains("--test-duplicate") || arguments.contains("--test-send-file")
                 || arguments.contains("--test-linux-share") || arguments.contains("--test-ctl")
                 || arguments.contains("--test-disk-info") || arguments.contains("--run-in-guest")
@@ -677,6 +677,9 @@ enum SaveResumeTestJob {
             }
             if arguments.contains("--test-backup") {
                 await finish(await backup(folderURL, guest))
+            }
+            if arguments.contains("--test-utm-export") {
+                await finish(await utmExport(folderURL, guest))
             }
             if arguments.contains("--test-windows-3d") {
                 await finish(await windows3D(folderURL))
@@ -1460,6 +1463,48 @@ enum SaveResumeTestJob {
         check("the oldest is gone", !names.contains(old[0]))
         check("the newer two stay", names.contains(old[1]) && names.contains(old[2]))
         check("another machine's backup stays", names.contains(someoneElse))
+        return ok
+    }
+
+    /// --test-utm-export (2026-11-17, UTMExport.swift): the machine in
+    /// --vm, shut down, written as a UTM package beside it, in
+    /// utm-export-test, which is KEPT so it can be opened in UTM by hand.
+    /// Checks what Guest House can check itself: the files, their formats
+    /// and the settings UTM reads. That UTM starts it is not checked here.
+    private static func utmExport(_ folder: URL, _ guest: GuestOS) async -> Bool {
+        let fm = FileManager.default
+        let target = folder.deletingLastPathComponent().appendingPathComponent("utm-export-test", isDirectory: true)
+        try? fm.createDirectory(at: target, withIntermediateDirectories: true)
+        var config = configuration(folder: folder, guest: guest)
+        config.name = "Guest House \(guest.displayName) test"
+        let done = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            MachineArchiveController.shared.exportForUTM(config, isRunning: false, into: target) { continuation.resume(returning: $0) }
+        }
+        check("it says it's done", done)
+        let package = target.appendingPathComponent(UTMExport.packageName(for: config))
+        print("   \(package.path)")
+        let data = package.appendingPathComponent("Data")
+        func starts(_ name: String, with magic: [UInt8]) -> Bool {
+            guard let handle = try? FileHandle(forReadingFrom: data.appendingPathComponent(name)) else { return false }
+            defer { try? handle.close() }
+            return Array((try? handle.read(upToCount: magic.count)) ?? Data()) == magic
+        }
+        let qcow2: [UInt8] = [0x51, 0x46, 0x49, 0xFB]
+        check("the disk is a qcow2 file", starts("disk.qcow2", with: qcow2))
+        check("the firmware's variables are a qcow2 file", starts("efi_vars.fd", with: qcow2))
+        let settings = (try? Data(contentsOf: package.appendingPathComponent("config.plist")))
+            .flatMap { try? PropertyListSerialization.propertyList(from: $0, format: nil) as? [String: Any] }
+        check("config.plist reads as a property list", settings != nil)
+        let drives = settings?["Drive"] as? [[String: Any]] ?? []
+        check("it names the disk", drives.first?["ImageName"] as? String == "disk.qcow2")
+        let wantsTPM = (settings?["QEMU"] as? [String: Any])?["TPMDevice"] as? Bool == true
+        check("a TPM for Windows, none for plain Linux", wantsTPM == (guest == .windows))
+        if wantsTPM {
+            // swtpm's linear store begins "swtpmlin", written as one number.
+            check("the TPM's contents went, in UTM's one-file form", starts("tpmdata", with: Array("nilmptws".utf8)))
+        }
+        let leftovers = ((try? fm.contentsOfDirectory(atPath: target.path)) ?? []).filter { $0.contains("-partial-") }
+        check("nothing half-written is left", leftovers.isEmpty)
         return ok
     }
 

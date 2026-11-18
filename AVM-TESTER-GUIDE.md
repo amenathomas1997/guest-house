@@ -267,6 +267,19 @@ other Mac's with it: its shared folder, microphone, camera, printers,
 keyboard for Windows and monitor are off until you choose them again in
 its Settings, so a package from someone else can't reach into your Mac.
 
+**Export for UTM: taking a machine to another app.** UTM is a free
+virtual machine app for the Mac. Shut a Windows or Linux machine down,
+then choose **Export for UTM…** in the Virtual Machine menu (with several
+machines it is a submenu of their names), or **Export** *name* **for
+UTM…** in the machine's actions menu, VO-Shift-M on its row. Pick a
+folder or a drive; Guest House saves a copy there named after the machine,
+ending in **.utm**, and says how it is going and when it is done. In UTM,
+choose File, then Open, and choose that folder. UTM runs the machine from
+where it is, so don't move or remove it afterwards. The copy has the
+disk and the same virtual hardware. It doesn't have the machine's restore
+points, or Guest House's own settings for it. Your machine in Guest House
+stays as it was. macOS machines can't be exported for UTM.
+
 Things to know:
 
 - Guest House refuses, and says why, if the machine is running, if a macOS machine

@@ -49,6 +49,7 @@ let package = Package(
                 "AVM/HIDReportDescriptor.swift",
                 "AVM/MacGuestFiles.swift",
                 "AVM/MachineArchive.swift",
+                "AVM/UTMExport.swift",
                 "AVM/RemoteDesktopAddress.swift",
                 // For its file and checksum patterns (2026-10-30).
                 "views/LinuxISODownload.swift",
