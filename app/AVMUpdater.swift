@@ -260,6 +260,9 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.57", changes: [
+            "Fixed: Windows apps appeared in Command-Tab and the Dock a minute or more late, or seemed not to appear at all, and left just as late. Guest House's helper in Windows could not update its list of open apps: a temporary file left behind by an earlier fault was in its way, and Windows refused the update every time. Guest House made do with a spare copy that it only reads once a minute. The helper now starts each update with a fresh file, so the list follows Windows within a few seconds again. The helper updates itself the first time a Windows machine starts with this version.",
+        ]),
         ReleaseNote(version: "0.4.56", changes: [
             "Fixed: Windows apps had stopped appearing in Command-Tab and the Dock. Guest House keeps a small helper in Windows that lists the open apps. A security step that tightens the permissions on the helper's folder left a helper that was already there with no permissions at all, so Guest House could no longer update it or start it. It showed on any Windows machine set up before early November. The machine mends itself the first time it starts with this version; give it a minute after you sign in to Windows.",
         ]),

@@ -54,8 +54,9 @@ final class WindowsApps {
     /// deleted at start-up, 2026-11-08; 9: requests in a folder Users can't
     /// write, launch keys checked, one helper per request, survives a
     /// missing apps folder, 2026-11-09; 10: programs launched only from
-    /// Program Files, Windows or the user's own profile, 2026-11-09).
-    static let helperVersion = "10"
+    /// Program Files, Windows or the user's own profile, 2026-11-09; 11: a
+    /// list file that SYSTEM owns is still replaced, 2026-11-18).
+    static let helperVersion = "11"
     static let guestFolder = #"C:\ProgramData\AVM"#
 
     /// What a Mac app stands for: an app open in Windows, one kept in the

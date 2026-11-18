@@ -482,8 +482,22 @@ static class AVMWindowsApps
     static void Write(string path, string text)
     {
         string temp = path + ".new";
+        // A new temporary file every time (2026-11-18). One left behind by
+        // an earlier failure was written into where it lay, and once Guest
+        // House's lockdown had made SYSTEM its owner, Replace, which copies
+        // the old file's access list onto it and so needs to own it, was
+        // refused every time after ("Access to the path is denied"): the
+        // list stood still, and the Mac followed the slower stuck copy.
+        try { File.Delete(temp); } catch { }
         File.WriteAllText(temp, text, new UTF8Encoding(false));
-        if (File.Exists(path)) File.Replace(temp, path, null); else File.Move(temp, path);
+        if (!File.Exists(path)) { File.Move(temp, path); return; }
+        // And if Replace is refused all the same, the old file goes and
+        // the new one takes its name, which Users' own rights here allow.
+        try { File.Replace(temp, path, null, true); return; }
+        catch (UnauthorizedAccessException) { }
+        catch (IOException) { }
+        File.Delete(path);
+        File.Move(temp, path);
     }
 
     // MARK: Windows

@@ -531,6 +531,19 @@ final class VMManager: ObservableObject {
     }
     private var vmSocketDir: URL?
     /// The QEMU guest agent's socket (GuestAgent.swift), in vmSocketDir.
+    /// A test job's machine with no sound at all, in a Debug build only
+    /// (2026-11-18): with the Mac locked and its headset off, Core Audio
+    /// answered for no output, so no live job could start a machine, and a
+    /// test may not change the Mac's sound setting. `--no-sound` beside
+    /// `--vm`; a release build never reads it.
+    static let testWithoutSound: Bool = {
+        #if DEBUG
+        return CommandLine.arguments.contains("--no-sound") && CommandLine.arguments.contains("--vm")
+        #else
+        return false
+        #endif
+    }()
+
     var guestAgentSocketPath: String? { vmSocketDir?.appendingPathComponent("qga.sock").path }
 
     // Boot keypress: an async Task (NOT a Timer) that sends Enter repeatedly
@@ -1665,7 +1678,7 @@ final class VMManager: ObservableObject {
         // opens it before it answers anything, and when Core Audio doesn't
         // come back the Start hung for minutes and ended with a timeout
         // that named nothing. Eight seconds; it takes a tenth of one.
-        if !(await SoundOutputDevices.answers(within: 8, uid: configuration.soundOutputUID)) {
+        if !Self.testWithoutSound, !(await SoundOutputDevices.answers(within: 8, uid: configuration.soundOutputUID)) {
             // By name when Core Audio gives one: a wireless headset that
             // is off, its receiver still plugged in, is the case seen.
             let output = await SoundOutputDevices.outputName(uid: configuration.soundOutputUID)
@@ -3054,7 +3067,11 @@ final class VMManager: ObservableObject {
         // coreaudio patch); QEMU falls back to the default output when
         // that device isn't connected.
         let outputDevice = configuration.soundOutputUID.map { ",out.dev=\(SoundOutputDevices.qemuValue($0))" } ?? ""
-        args += ["-audiodev", "coreaudio,id=avmaudio,out.frequency=48000,out.buffer-length=\(output.microseconds),out.buffer-count=\(output.count),timer-period=1250,\(microphone)\(outputDevice)"]
+        if Self.testWithoutSound {
+            args += ["-audiodev", "none,id=avmaudio"]
+        } else {
+            args += ["-audiodev", "coreaudio,id=avmaudio,out.frequency=48000,out.buffer-length=\(output.microseconds),out.buffer-count=\(output.count),timer-period=1250,\(microphone)\(outputDevice)"]
+        }
         avmLog("buildQEMUArguments: sound \(configuration.soundSmoothness.rawValue), \(output.microseconds) us x \(output.count)")
         args += ["-device", "intel-hda"]
         args += ["-device", "hda-duplex,id=avmhda,audiodev=avmaudio,use-timer=off"]

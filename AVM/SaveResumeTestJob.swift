@@ -903,6 +903,13 @@ enum SaveResumeTestJob {
             secureBoot: guest == .windows ? true : nil)
         // --nvme: a test machine installed before the virtio disk (2026-10-27).
         configuration.diskBus = CommandLine.arguments.contains("--nvme") ? nil : "virtio"
+        // --sound-output UID: a test machine's sound goes to that output
+        // (2026-11-18: the Mac's own was a wireless headset that was off,
+        // which no machine starts on, and a test may not change the Mac's
+        // setting). "BuiltInSpeakerDevice" is the Mac's speakers.
+        if let at = CommandLine.arguments.firstIndex(of: "--sound-output"), at + 1 < CommandLine.arguments.count {
+            configuration.soundOutputUID = CommandLine.arguments[at + 1]
+        }
         // --camera: any test with the Mac's camera attached (2026-10-27),
         // as --test-save-resume --camera, which checks it can be saved.
         if CommandLine.arguments.contains("--camera") { configuration.shareCamera = true }
@@ -1404,6 +1411,12 @@ enum SaveResumeTestJob {
         check("the helper installs over one that's already there", await WindowsApps.shared.ensureHelper(manager, machine: config.id))
         let again = (try? await WindowsApps.readGuestFile(manager, root + #"\bin\version.txt"#)) ?? nil
         check("and is version \(WindowsApps.helperVersion) again (\(again ?? "none"))", again?.trimmingCharacters(in: .whitespacesAndNewlines) == WindowsApps.helperVersion)
+        // A temporary list file left behind and owned by SYSTEM, as an
+        // earlier failure and then the lockdown left one in a tester's
+        // Windows (2026-11-18): the helper wrote into it where it lay, and
+        // the swap was then refused every time.
+        let planted: Bool = (try? await WindowsApps.writeGuestFile(manager, root + #"\apps\running.txt.new"#, "left over\n")) != nil
+        check("a left-over temporary list file is in the way", planted)
         var running = false
         for _ in 0..<40 where !running {
             try? await Task.sleep(for: .seconds(3))
@@ -1442,6 +1455,19 @@ enum SaveResumeTestJob {
         if !inFront { print("   note: Windows didn't let the helper bring it to the front") }
         let after = await exec(agent, program: "tasklist.exe", args: ["/fo", "csv", "/nh"]) ?? ""
         check("Character Map is open", after.lowercased().contains("charmap"))
+        // In running.txt itself, not only the stuck copy beside it
+        // (2026-11-18: a list file the lockdown had given to SYSTEM could
+        // no longer be replaced by the helper, and the Mac's list ran a
+        // minute or more behind on the stuck copy).
+        var listed = false
+        for _ in 0..<15 where !listed {
+            try? await Task.sleep(for: .seconds(2))
+            let now = (try? await WindowsApps.readGuestFile(manager, root + #"\apps\running.txt"#)) ?? nil
+            listed = (now ?? "").lowercased().contains("charmap")
+        }
+        check("the list file itself now has Character Map, after the lockdown ran over it", listed)
+        let stuck = (try? await WindowsApps.readGuestFile(manager, root + #"\apps\running-stuck.txt"#)) ?? nil
+        check("and there's no stuck copy (\((stuck ?? "none").split(whereSeparator: \.isNewline).first ?? "empty"))", stuck == nil)
         let bad = await ask("902", #"C:\no\such\program.exe"#)
         print("   reply: \(bad ?? "none")")
         check("an unknown program is refused", bad?.contains("\tfailed") == true)
