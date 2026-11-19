@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.58</title>
+            <sparkle:version>78</sparkle:version>
+            <sparkle:shortVersionString>0.4.58</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>Fixed: in a machine exported for UTM, speech and every other sound could play fast and high, like a tape sped up. UTM asks the Mac&#x27;s sound output for 44,100 samples a second, and an output that can only run at 48,000, as some USB headsets do, then plays everything about 9 percent too fast. An exported machine now tells UTM to use 48,000, which is what Mac speakers, AirPods and USB headsets run at.</li><li>A machine you already exported keeps the old sound set-up: export it again to get the new one. Because of the change, UTM&#x27;s own settings for the machine show no sound card; it is in the machine&#x27;s QEMU arguments.</li><li>I couldn&#x27;t judge this by ear myself, so I&#x27;d like to hear how an exported machine sounds for you. If speech is still at the wrong speed, choose SPICE with GStreamer under Sound in UTM&#x27;s settings.</li></ul>]]></description>
+            <pubDate>Thu, 19 Nov 2026 00:24:21 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.58/GuestHouse-0.4.58.zip" sparkle:edSignature="ppvu6+11CtgtJCkQRCn1qPmXiZF7kkEXAKj93MLzCgHiZV1QZJo0AZHJUvBgrGEC8z3pG+Beb9wGWRePbB0UAg==" length="106824443" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.57</title>
             <sparkle:version>77</sparkle:version>
             <sparkle:shortVersionString>0.4.57</sparkle:shortVersionString>
