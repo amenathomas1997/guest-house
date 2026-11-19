@@ -260,6 +260,11 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.58", changes: [
+            "Fixed: in a machine exported for UTM, speech and every other sound could play fast and high, like a tape sped up. UTM asks the Mac's sound output for 44,100 samples a second, and an output that can only run at 48,000, as some USB headsets do, then plays everything about 9 percent too fast. An exported machine now tells UTM to use 48,000, which is what Mac speakers, AirPods and USB headsets run at.",
+            "A machine you already exported keeps the old sound set-up: export it again to get the new one. Because of the change, UTM's own settings for the machine show no sound card; it is in the machine's QEMU arguments.",
+            "I couldn't judge this by ear myself, so I'd like to hear how an exported machine sounds for you. If speech is still at the wrong speed, choose SPICE with GStreamer under Sound in UTM's settings.",
+        ]),
         ReleaseNote(version: "0.4.57", changes: [
             "Fixed: Windows apps appeared in Command-Tab and the Dock a minute or more late, or seemed not to appear at all, and left just as late. Guest House's helper in Windows could not update its list of open apps: a temporary file left behind by an earlier fault was in its way, and Windows refused the update every time. Guest House made do with a spare copy that it only reads once a minute. The helper now starts each update with a fresh file, so the list follows Windows within a few seconds again. The helper updates itself the first time a Windows machine starts with this version.",
         ]),

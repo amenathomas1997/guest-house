@@ -3106,8 +3106,16 @@ final class UTMExportTests: XCTestCase {
         XCTAssertEqual(qemu["RTCLocalTime"] as? Bool, true, "Windows keeps the clock in local time")
         let extra = try XCTUnwrap(qemu["AdditionalArguments"] as? [String])
         XCTAssertEqual(extra.first, "-smbios")
-        XCTAssertTrue(extra.last?.contains("serial=\(id.uuidString)") == true, "the identity Windows activation saw")
-        XCTAssertTrue(extra.last?.hasPrefix("\"") == true && extra.last?.hasSuffix("\"") == true, "in quotes, or UTM splits it at its spaces")
+        let identity = try XCTUnwrap(extra.dropFirst().first)
+        XCTAssertTrue(identity.contains("serial=\(id.uuidString)"), "the identity Windows activation saw")
+        XCTAssertTrue(identity.hasPrefix("\"") && identity.hasSuffix("\""), "in quotes, or UTM splits it at its spaces")
+        // The sound card with its rate, and none in UTM's own list
+        // (2026-11-18: UTM's 44,100 on a 48,000-only headset played fast).
+        XCTAssertEqual(Array(extra.dropFirst(2)), UTMExport.soundArguments)
+        XCTAssertTrue(extra.contains("coreaudio,id=ghaudio,out.frequency=48000"))
+        XCTAssertTrue(extra.contains("hda-output,audiodev=ghaudio"))
+        XCTAssertFalse(UTMExport.soundArguments.contains { $0.contains(" ") }, "UTM splits an argument at its spaces")
+        XCTAssertEqual((made["Sound"] as? [[String: Any]])?.count, 0, "or UTM adds a second card at its own rate")
         let info = try XCTUnwrap(made["Information"] as? [String: Any])
         XCTAssertEqual(info["UUID"] as? String, id.uuidString)
         XCTAssertEqual(info["Name"] as? String, "Work PC")

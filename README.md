@@ -256,6 +256,15 @@ as the shared folder you chose, Remote Desktop, the keyboard for Windows
 and the sound choices. The machine in Guest House isn't changed. macOS
 machines can't be exported for UTM.
 
+Sound in UTM: the copy asks UTM to play at 48,000 samples a second, which
+is what Mac speakers, AirPods and USB headsets run at. Without that, UTM
+assumes 44,100, and a headset that can only do 48,000 plays speech fast
+and high. For that reason UTM's own settings for the machine show no sound
+card: it is in the machine's QEMU arguments. The microphone isn't passed
+on. If speech is still at the wrong speed on your output device, choose
+"SPICE with GStreamer" under Sound in UTM's settings, and add an Intel HDA
+sound card to the machine in UTM in place of the arguments.
+
 ## Secure Boot
 
 New Windows machines have Secure Boot, with Microsoft's keys, so Windows

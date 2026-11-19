@@ -18,7 +18,7 @@
 //
 // WHAT UTM IS TOLD, so the system inside meets the hardware it knows:
 //   - the same disk connection (virtio or NVMe), network card (virtio),
-//     sound card (Intel HDA) and USB 3 controller;
+//     sound card (Intel HDA, see soundArguments) and USB 3 controller;
 //   - the same machine UUID and SMBIOS identity (the -smbios line goes in
 //     UTM's additional arguments), which Windows activation looks at;
 //   - a TPM for every Windows machine, and for any machine with Secure
@@ -137,7 +137,7 @@ enum UTMExport {
                 // In quotes: UTM splits each of these at spaces unless it is
                 // (measured 2026-11-17: "Could not open 'Virtual'"), and takes
                 // the quotes off.
-                "AdditionalArguments": ["-smbios", "\"type=1,manufacturer=AVM,product=AVM Virtual Machine,serial=\(id)\""]
+                "AdditionalArguments": ["-smbios", "\"type=1,manufacturer=AVM,product=AVM Virtual Machine,serial=\(id)\""] + soundArguments
             ] as [String: Any],
             "Input": [
                 "UsbBusSupport": "3.0",
@@ -175,9 +175,26 @@ enum UTMExport {
                 "PortForward": [[String: Any]]()
             ] as [String: Any]],
             "Serial": [[String: Any]](),
-            "Sound": [["Hardware": "intel-hda"]]
+            // None of UTM's own: see soundArguments.
+            "Sound": [[String: Any]]()
         ]
     }
+
+    /// The sound card, in UTM's additional arguments and not in its Sound
+    /// list (2026-11-18: in UTM "JAWS sounds like Alvin and the Chipmunks").
+    /// On a Mac UTM has QEMU play to the Mac itself, with QEMU's stock
+    /// CoreAudio code, which asks the output device for 44,100 samples a
+    /// second and takes it that it got them. A device that only runs at
+    /// 48,000 (the user's USB headset: read from Core Audio, it can do
+    /// nothing else) then plays everything about 9 percent fast and high.
+    /// UTM's Sound list has no place for a rate, so the same card, an Intel
+    /// HDA with an output codec as UTM makes it, is given here with 48,000,
+    /// the rate Mac speakers, AirPods and USB headsets run at. UTM's engine
+    /// recorded at the right speed to a file either way (measured in UTM
+    /// 5.0.8), so the fault is only in that last step. Not heard by me: a
+    /// test can't hear pitch. No spaces in these, so UTM leaves them whole.
+    static let soundArguments = ["-audiodev", "coreaudio,id=ghaudio,out.frequency=48000",
+                                 "-device", "intel-hda", "-device", "hda-output,audiodev=ghaudio"]
 
     static func settingsData(for configuration: VMConfiguration, drives: [Drive], appVersion: String?) throws -> Data {
         try PropertyListSerialization.data(fromPropertyList: settings(for: configuration, drives: drives, appVersion: appVersion),
