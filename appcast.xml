@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.60</title>
+            <sparkle:version>80</sparkle:version>
+            <sparkle:shortVersionString>0.4.60</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>Export for UTM now tells you when UTM needs to be quit and opened again. UTM reads a machine&#x27;s settings when it opens and keeps them until it quits. If you export a machine again while UTM is open, UTM goes on using the old settings. That is why speech in an exported machine could still sound fast after the fix in 0.4.58. When UTM is open, the export&#x27;s closing words now say to quit UTM with Command-Q and open it again before you start the machine.</li><li>The sound fix from 0.4.58 is confirmed: in a machine exported again and started in a freshly opened UTM, JAWS speaks at its normal speed.</li><li>Also confirmed, on a Windows machine in daily use: with 0.4.59 Windows reports its TPM as ready and did not ask for the PIN to be set up again, and Windows apps show up in Command-Tab quickly.</li></ul>]]></description>
+            <pubDate>Fri, 20 Nov 2026 03:17:23 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.60/GuestHouse-0.4.60.zip" sparkle:edSignature="JEXGklpOIg8uS0pdU+RKhVQhgZG9iuUfpiaXcSUDC+N+eojwyZ4uAFsp7b+r8uO8xN7ZuBH1r6Qs1nD7jY8WAw==" length="106836247" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.59</title>
             <sparkle:version>79</sparkle:version>
             <sparkle:shortVersionString>0.4.59</sparkle:shortVersionString>
