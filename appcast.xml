@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.59</title>
+            <sparkle:version>79</sparkle:version>
+            <sparkle:shortVersionString>0.4.59</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>Fixed: Windows 11 could not set up its security chip, the TPM, in a Guest House machine, and logged a TPM hardware error several times at every start. A part of the virtual TPM that Windows asks for was missing. It is there now, and Windows reports the TPM as ready. Thanks to Allison for finding the fault; the fix here is my own, because hers doesn&#x27;t fit Guest House&#x27;s engine.</li><li>Because of this, Windows sets its TPM up the first time a machine starts with this version. On my test machine that went by without a word and a machine saved before the update resumed as usual. I could not test a Windows that uses a Windows Hello PIN or BitLocker. If Windows asks you to set your PIN up again, or anything else about signing in changes, please tell me.</li><li>New: Guest House tells you when its helper in Windows keeps failing. Until now, if the helper could not be installed, or its list of open apps stopped updating, Windows apps just went missing from Command-Tab and nothing said why. Guest House now says so once, names the machine, and points you to Report a Problem in the Help menu. It also says when the fault has cleared.</li><li>Behind the scenes: every release is now also tested on a Windows machine that was set up with an October version and carries the leftovers of the versions since, the way a long-used machine does. The last two Command-Tab faults only showed on machines like that.</li></ul>]]></description>
+            <pubDate>Fri, 20 Nov 2026 01:32:17 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.59/GuestHouse-0.4.59.zip" sparkle:edSignature="ZUpibNf/xlVMcia+0IIVfPMKLu+NkzOy8gN8eFoz68zpokqtO2IWgr2vtGIaS+yiUvb9T8RRP12/E2TQLzqKAQ==" length="106835453" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.58</title>
             <sparkle:version>78</sparkle:version>
             <sparkle:shortVersionString>0.4.58</sparkle:shortVersionString>
