@@ -3085,6 +3085,67 @@ final class HelperVersionTests: XCTestCase {
 
 // MARK: - Export for UTM (2026-11-17)
 
+/// Failures that go on are said once (2026-11-19).
+final class QuietFailureTests: XCTestCase {
+    private let machine = UUID()
+
+    func testAnInstallIsSaidAtItsSecondFailureAndOnlyOnce() {
+        var tally = QuietFailureTally()
+        XCTAssertFalse(tally.failed(.helperInstall, machine: machine), "the first may be a Windows still starting")
+        XCTAssertTrue(tally.failed(.helperInstall, machine: machine))
+        XCTAssertFalse(tally.failed(.helperInstall, machine: machine), "said once, not every ten minutes")
+        XCTAssertFalse(tally.failed(.helperInstall, machine: machine))
+    }
+
+    func testAStuckListNeedsBothTriesAndTime() {
+        var tally = QuietFailureTally()
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertFalse(tally.failed(.listStuck, machine: machine, at: start))
+        XCTAssertFalse(tally.failed(.listStuck, machine: machine, at: start.addingTimeInterval(60)))
+        XCTAssertFalse(tally.failed(.listStuck, machine: machine, at: start.addingTimeInterval(120)), "three tries, but not yet 150 seconds")
+        XCTAssertTrue(tally.failed(.listStuck, machine: machine, at: start.addingTimeInterval(180)))
+        XCTAssertFalse(tally.failed(.listStuck, machine: machine, at: start.addingTimeInterval(240)))
+    }
+
+    func testWorkingAgainIsSaidOnlyAfterAFailureWasSaid() {
+        var tally = QuietFailureTally()
+        XCTAssertFalse(tally.worked(.helperInstall, machine: machine), "nothing was wrong")
+        _ = tally.failed(.helperInstall, machine: machine)
+        XCTAssertFalse(tally.worked(.helperInstall, machine: machine), "one failure was never spoken of")
+        _ = tally.failed(.helperInstall, machine: machine)
+        XCTAssertTrue(tally.failed(.helperInstall, machine: machine), "the count began again after it worked")
+        XCTAssertTrue(tally.worked(.helperInstall, machine: machine))
+        XCTAssertFalse(tally.worked(.helperInstall, machine: machine))
+    }
+
+    func testKindsAndMachinesAreCountedApart() {
+        var tally = QuietFailureTally()
+        let other = UUID()
+        _ = tally.failed(.helperInstall, machine: machine)
+        XCTAssertFalse(tally.failed(.helperInstall, machine: other), "another machine's first")
+        XCTAssertFalse(tally.failed(.listStuck, machine: machine), "another kind's first")
+        XCTAssertTrue(tally.failed(.helperInstall, machine: machine))
+    }
+
+    func testAStoppedMachineStartsAgainFromNothing() {
+        var tally = QuietFailureTally()
+        _ = tally.failed(.helperInstall, machine: machine)
+        _ = tally.failed(.helperInstall, machine: machine)
+        tally.forget(machine: machine)
+        XCTAssertFalse(tally.failed(.helperInstall, machine: machine))
+        XCTAssertTrue(tally.failed(.helperInstall, machine: machine), "and is said again at its next start")
+    }
+
+    func testTheWordsNameTheMachineAndWhereToSendDetails() {
+        for kind in QuietFailureTally.Kind.allCases {
+            let said = QuietFailureTally.message(kind, machineName: "Work PC")
+            XCTAssertTrue(said.hasPrefix("Work PC: "))
+            XCTAssertTrue(said.contains("Report a Problem"))
+            XCTAssertTrue(QuietFailureTally.recoveredMessage(kind, machineName: "Work PC").contains("again"))
+        }
+    }
+}
+
 final class UTMExportTests: XCTestCase {
     private func settings(_ change: (inout VMConfiguration) -> Void) -> [String: Any] {
         var config = VMConfiguration(name: "Work PC", cpuCount: 6, ramSizeGB: 8, diskSizeGB: 64, diskImagePath: "/tmp/x/disk.qcow2")

@@ -260,6 +260,12 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.59", changes: [
+            "Fixed: Windows 11 could not set up its security chip, the TPM, in a Guest House machine, and logged a TPM hardware error several times at every start. A part of the virtual TPM that Windows asks for was missing. It is there now, and Windows reports the TPM as ready. Thanks to Allison for finding the fault; the fix here is my own, because hers doesn't fit Guest House's engine.",
+            "Because of this, Windows sets its TPM up the first time a machine starts with this version. On my test machine that went by without a word and a machine saved before the update resumed as usual. I could not test a Windows that uses a Windows Hello PIN or BitLocker. If Windows asks you to set your PIN up again, or anything else about signing in changes, please tell me.",
+            "New: Guest House tells you when its helper in Windows keeps failing. Until now, if the helper could not be installed, or its list of open apps stopped updating, Windows apps just went missing from Command-Tab and nothing said why. Guest House now says so once, names the machine, and points you to Report a Problem in the Help menu. It also says when the fault has cleared.",
+            "Behind the scenes: every release is now also tested on a Windows machine that was set up with an October version and carries the leftovers of the versions since, the way a long-used machine does. The last two Command-Tab faults only showed on machines like that.",
+        ]),
         ReleaseNote(version: "0.4.58", changes: [
             "Fixed: in a machine exported for UTM, speech and every other sound could play fast and high, like a tape sped up. UTM asks the Mac's sound output for 44,100 samples a second, and an output that can only run at 48,000, as some USB headsets do, then plays everything about 9 percent too fast. An exported machine now tells UTM to use 48,000, which is what Mac speakers, AirPods and USB headsets run at.",
             "A machine you already exported keeps the old sound set-up: export it again to get the new one. Because of the change, UTM's own settings for the machine show no sound card; it is in the machine's QEMU arguments.",

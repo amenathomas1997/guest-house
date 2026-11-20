@@ -32,6 +32,9 @@
 #          and HVF keeping the UEFI variable flash read-only when dirty
 #          tracking stops (2026-10-31: after a save, Windows hung at its
 #          boot manager on the next restart).
+#          The TPM on the ARM virt machine has its physical presence
+#          interface (2026-11-19: without it Windows 11 logged a TPM
+#          error at every boot and could not provision the TPM).
 #          Each patch's header says what it does and where it comes from.
 #          Patches for git clones, which UTM's build doesn't patch, are in
 #          Tools/sysroot-patches/clones, applied just before their build:
@@ -874,6 +877,11 @@ grep -q '"usb-camera"' <<<"$devices" \
     || problem "QEMU has no usb-camera device (Tools/sysroot-patches/qemu-10.0.12-utm+usb-camera.patch)"
 grep -q '"usb-hid-bridge"' <<<"$devices" \
     || problem "QEMU has no usb-hid-bridge device (Tools/sysroot-patches/qemu-10.0.12-utm+usb-hid-bridge.patch)"
+# The TPM's physical presence interface (2026-11-19): without it Windows 11
+# logs a TPM error at every boot and can't provision the TPM.
+tpm_options=$("$OUT/bin/qemu-system-aarch64" -device tpm-tis-device,help 2>/dev/null || true)
+grep -q 'ppi=' <<<"$tpm_options" \
+    || problem "QEMU's tpm-tis-device has no ppi option (Tools/sysroot-patches/qemu-10.0.12-utm+tpm-tis-sysbus-ppi.patch)"
 grep -q '"virtio-gpu-gl-pci"' <<<"$devices" \
     || problem "QEMU has no virtio-gpu-gl-pci: it was built without OpenGL or virglrenderer"
 # The helper's usbredirhost sends long interrupt OUT transfers (2026-10-29):

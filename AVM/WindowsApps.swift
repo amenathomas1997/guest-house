@@ -100,6 +100,18 @@ final class WindowsApps {
     /// moves again. Before, it was used on one pass a minute and the stale
     /// running.txt on the others, so Command-Tab flipped between the two.
     private var stuckList: [UUID: String] = [:]
+    /// Failures that go on are said once (2026-11-19, QuietFailureLogic.swift).
+    private var quietFailures = QuietFailureTally()
+
+    private func noteFailure(_ kind: QuietFailureTally.Kind, machine: UUID, name: String) {
+        guard quietFailures.failed(kind, machine: machine) else { return }
+        Announcer.shared.announce(QuietFailureTally.message(kind, machineName: name), tone: .failure)
+    }
+
+    private func noteWorking(_ kind: QuietFailureTally.Kind, machine: UUID, name: String) {
+        guard quietFailures.worked(kind, machine: machine) else { return }
+        Announcer.shared.announce(QuietFailureTally.recoveredMessage(kind, machineName: name), tone: .info)
+    }
     private var listWait: [UUID: TimeInterval] = [:]
     private var nextListRead: [UUID: Date] = [:]
     private var ticking = false
@@ -149,7 +161,7 @@ final class WindowsApps {
         let running = Set(machines.map { $0.configuration.id })
         let listed = Set(machines.filter { $0.configuration.hasWindowsAppsInCommandTab }.map { $0.configuration.id })
         for machine in entries.keys where !listed.contains(machine) { quitEntries(of: machine) }
-        for machine in helperReady.keys where !running.contains(machine) { helperReady[machine] = nil }
+        for machine in helperReady.keys where !running.contains(machine) { helperReady[machine] = nil; quietFailures.forget(machine: machine) }
         // Not carried into the next run (2026-11-09, fifth audit #25): an
         // unchanged running.txt would bring the old stuck list straight back.
         for machine in lastList.keys where !running.contains(machine) { forgetList(of: machine) }
@@ -190,6 +202,7 @@ final class WindowsApps {
                     stuckReason[id] = nil
                     stuckList[id] = nil
                     AVMLog.write("Windows apps: \(session.configuration.name) updates its list of open apps again", category: "WindowsApps")
+                    noteWorking(.listStuck, machine: id, name: session.configuration.name)
                 }
                 if !moved, listWait[id] == 12, Date() >= (nextStuckRead[id] ?? .distantPast) {
                     nextStuckRead[id] = Date().addingTimeInterval(60)
@@ -212,11 +225,13 @@ final class WindowsApps {
                             stuckReason[id] = why
                             AVMLog.write("Windows apps: \(session.configuration.name) can't update its list of open apps (\(why)); using the copy its helper put beside it", category: "WindowsApps")
                         }
+                        noteFailure(.listStuck, machine: id, name: session.configuration.name)
                         stuckList[id] = String(lines[1])
                     } else if stuckReason[id] != nil {
                         stuckReason[id] = nil
                         stuckList[id] = nil
                         AVMLog.write("Windows apps: \(session.configuration.name) updates its list of open apps again", category: "WindowsApps")
+                        noteWorking(.listStuck, machine: id, name: session.configuration.name)
                     }
                 }
                 if let stuck = stuckList[id] { list = stuck }
@@ -844,6 +859,7 @@ final class WindowsApps {
         let version = try? await Self.readGuestFile(manager, Self.guestFolder + #"\bin\version.txt"#)
         if version?.trimmingCharacters(in: .whitespacesAndNewlines) == Self.helperVersion {
             helperReady[machine] = manager.qemuPID
+            noteWorking(.helperInstall, machine: machine, name: manager.machineName)
             return true
         }
         if let failed = installFailed[machine], failed.run == manager.qemuPID, Date() < failed.retry { return false }
@@ -861,9 +877,11 @@ final class WindowsApps {
             guard output.contains("AVM-INSTALLED") else {
                 AVMLog.write("Windows apps: the helper didn't install: \(output.prefix(600)); trying again in \(Int(Self.installRetry / 60)) minutes or at the next start", category: "WindowsApps")
                 installFailed[machine] = (manager.qemuPID, Date().addingTimeInterval(Self.installRetry))
+                noteFailure(.helperInstall, machine: machine, name: manager.machineName)
                 return false
             }
             installFailed[machine] = nil
+            noteWorking(.helperInstall, machine: machine, name: manager.machineName)
             AVMLog.write("Windows apps: helper \(Self.helperVersion) installed in \(manager.machineName)", category: "WindowsApps")
             helperReady[machine] = manager.qemuPID
             return true
@@ -873,6 +891,7 @@ final class WindowsApps {
             if agentAnswered {
                 AVMLog.write("Windows apps: the helper didn't install: \(error.localizedDescription); trying again in \(Int(Self.installRetry / 60)) minutes or at the next start", category: "WindowsApps")
                 installFailed[machine] = (manager.qemuPID, Date().addingTimeInterval(Self.installRetry))
+                noteFailure(.helperInstall, machine: machine, name: manager.machineName)
             }
             return false
         }

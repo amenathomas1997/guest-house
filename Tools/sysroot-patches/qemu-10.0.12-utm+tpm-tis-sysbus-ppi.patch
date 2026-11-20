@@ -1,0 +1,159 @@
+AVM: the TPM's physical presence interface on the ARM virt machine
+
+Windows 11 on ARM looks for the TPM's physical presence interface (PPI) in
+ACPI. tpm-tis-device on the platform bus had none, so Windows logged
+Event 15 from its TPM driver several times at every boot ("a
+non-recoverable error in the TPM hardware, which prevents TPM services
+(such as data encryption) from being used"), could not provision the TPM
+(TPM-WMI 1026), and Get-Tpm failed with 0x80284001; tpmtool showed an
+empty "PPI Version" (measured 2026-11-19 in a Windows 11 test machine;
+the same with tpm-crb-device).
+
+The fault was found by Allison Meloy in AVM, who fixed it there by
+backporting nine upstream QEMU commits of March 2026 to stock QEMU 10.0.2
+(allisonfm85/accessible-virtual-machine, Tools/qemu, issue 17). UTM's
+QEMU wires sysbus TPMs differently (the device builds its own ACPI node
+from an address tpm_sysbus_plug gives it), so that backport does not
+apply here. This does the same for UTM's layout, and is smaller:
+
+- tpm-tis-device gets the "ppi" property tpm-tis has on a PC, on by
+  default. When on, the PPI's memory is the device's second region, so
+  the platform bus places it like the first.
+- tpm_sysbus_plug records where it went ("x-ppibase").
+- tpm_build_ppi_acpi_at builds the PPI's ACPI methods at a given address;
+  tpm_build_ppi_acpi keeps its meaning (the fixed PC address) for the PC
+  callers. The device's ACPI node calls the new one.
+
+With it: PPI Version 1.3, TpmReady True, no Event 15. A machine saved
+before this patch resumes after it (the PPI then appears at Windows' next
+start). The PPI's memory is 0x400 bytes, less than a 16K page, so HVF
+says once at start that it can't map it ("Cannot add ... not aligned to
+page size") and serves it by trapping, which is all this rarely touched
+memory needs. tpm-crb-device is left as UTM has it: Guest House doesn't
+use it.
+
+--- a/hw/acpi/tpm.c
++++ b/hw/acpi/tpm.c
+@@ -20,7 +20,17 @@
+ #include "qapi/error.h"
+ #include "hw/acpi/tpm.h"
+ 
++/*
++ * AVM: the same interface at an address of the caller's choosing. On the
++ * ARM virt machine the TPM is on the platform bus, which places it, so
++ * the fixed PC address below is no use there.
++ */
+ void tpm_build_ppi_acpi(TPMIf *tpm, Aml *dev)
++{
++    tpm_build_ppi_acpi_at(tpm, dev, TPM_PPI_ADDR_BASE);
++}
++
++void tpm_build_ppi_acpi_at(TPMIf *tpm, Aml *dev, hwaddr ppi_base)
+ {
+     Aml *method, *field, *ifctx, *ifctx2, *ifctx3, *func_mask,
+         *not_implemented, *pak, *tpm2, *tpm3, *pprm, *pprq, *zero, *one;
+@@ -40,7 +50,7 @@
+      */
+     aml_append(dev,
+                aml_operation_region("TPP2", AML_SYSTEM_MEMORY,
+-                                    aml_int(TPM_PPI_ADDR_BASE + 0x100),
++                                    aml_int(ppi_base + 0x100),
+                                     0x5A));
+     field = aml_field("TPP2", AML_ANY_ACC, AML_NOLOCK, AML_PRESERVE);
+     aml_append(field, aml_named_field("PPIN", 8));
+@@ -56,7 +66,7 @@
+     aml_append(dev,
+                aml_operation_region(
+                    "TPP3", AML_SYSTEM_MEMORY,
+-                   aml_int(TPM_PPI_ADDR_BASE +
++                   aml_int(ppi_base +
+                            0x15a /* movv, docs/specs/tpm.rst */),
+                            0x1));
+     field = aml_field("TPP3", AML_BYTE_ACC, AML_NOLOCK, AML_PRESERVE);
+@@ -78,7 +88,7 @@
+ 
+         aml_append(method,
+             aml_operation_region("TPP1", AML_SYSTEM_MEMORY,
+-                aml_add(aml_int(TPM_PPI_ADDR_BASE), op, NULL), 0x1));
++                aml_add(aml_int(ppi_base), op, NULL), 0x1));
+         field = aml_field("TPP1", AML_BYTE_ACC, AML_NOLOCK, AML_PRESERVE);
+         aml_append(field, aml_named_field("TPPF", 8));
+         aml_append(method, field);
+--- a/include/hw/acpi/tpm.h
++++ b/include/hw/acpi/tpm.h
+@@ -252,6 +252,7 @@
+ #define TPM_I2C_INT_ENABLE_MASK   0x0
+ 
+ void tpm_build_ppi_acpi(TPMIf *tpm, Aml *dev);
++void tpm_build_ppi_acpi_at(TPMIf *tpm, Aml *dev, hwaddr ppi_base);
+ 
+ #endif /* CONFIG_TPM */
+ 
+--- a/hw/tpm/tpm_tis_sysbus.c
++++ b/hw/tpm/tpm_tis_sysbus.c
+@@ -40,6 +40,8 @@
+     TPMState state; /* not a QOM object */
+     uint64_t baseaddr;
+     uint64_t size;
++    /* AVM: where the platform bus put the physical presence interface */
++    uint64_t ppibase;
+ };
+ 
+ OBJECT_DECLARE_SIMPLE_TYPE(TPMStateSysBus, TPM_TIS_SYSBUS)
+@@ -100,6 +102,16 @@
+                        TPM_TIS_ADDR_BASE),
+     DEFINE_PROP_UINT64("x-size", TPMStateSysBus, size,
+                        TPM_TIS_ADDR_SIZE),
++    /*
++     * AVM: the physical presence interface (PPI), as tpm-tis on a PC has
++     * it. Without it Windows 11 on ARM logs Event 15 from the TPM driver
++     * at every boot ("a non-recoverable error in the TPM hardware"),
++     * cannot provision the TPM, and Get-Tpm fails with 0x80284001
++     * (measured 2026-11-19). Its memory is this device's second region;
++     * the platform bus places it and tpm_sysbus_plug records where.
++     */
++    DEFINE_PROP_BOOL("ppi", TPMStateSysBus, state.ppi_enabled, true),
++    DEFINE_PROP_UINT64("x-ppibase", TPMStateSysBus, ppibase, 0),
+ };
+ 
+ static void tpm_tis_sysbus_initfn(Object *obj)
+@@ -129,6 +141,11 @@
+         error_setg(errp, "'tpmdev' property is required");
+         return;
+     }
++
++    if (s->ppi_enabled) {
++        tpm_ppi_init_memory(&s->ppi, OBJECT(dev));
++        sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->ppi.ram);
++    }
+ }
+ 
+ static void build_tpm_tis_sysbus_aml(AcpiDevAmlIf *adev, Aml *scope)
+@@ -155,6 +172,9 @@
+      */
+     /* aml_append(crs, aml_irq_no_flags(sbdev->state.irq_num)); */
+     aml_append(dev, aml_name_decl("_CRS", crs));
++    if (sbdev->state.ppi_enabled && sbdev->ppibase) {
++        tpm_build_ppi_acpi_at(ti, dev, sbdev->ppibase);
++    }
+     aml_append(scope, dev);
+ }
+ 
+--- a/hw/tpm/tpm-sysbus.c
++++ b/hw/tpm/tpm-sysbus.c
+@@ -44,4 +44,15 @@
+                              tpm_base, &error_abort);
+     object_property_set_uint(OBJECT(sbdev), "x-size",
+                              tpm_size, &error_abort);
++
++    /* AVM: a second region is the physical presence interface's memory */
++    if (sbdev->num_mmio > 1 &&
++        object_property_find(OBJECT(sbdev), "x-ppibase")) {
++        hwaddr ppi_base = platform_bus_get_mmio_addr(pbusdev, sbdev, 1);
++
++        if (ppi_base != -1) {
++            object_property_set_uint(OBJECT(sbdev), "x-ppibase",
++                                     ppi_base + pbus_base, &error_abort);
++        }
++    }
+ }
