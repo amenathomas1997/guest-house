@@ -3147,6 +3147,14 @@ final class QuietFailureTests: XCTestCase {
 }
 
 final class UTMExportTests: XCTestCase {
+    func testTheExportSaysToReopenUTMOnlyWhenUTMWasOpen() {
+        XCTAssertEqual(UTMExport.openUTMAdvice(utmWasOpen: false), "")
+        let words = UTMExport.openUTMAdvice(utmWasOpen: true)
+        XCTAssertTrue(words.hasPrefix(" "), "it follows another sentence")
+        XCTAssertTrue(words.contains("quit UTM with Command-Q and open it again"))
+        XCTAssertEqual(UTMExport.utmBundleIdentifier, "com.utmapp.UTM")
+    }
+
     private func settings(_ change: (inout VMConfiguration) -> Void) -> [String: Any] {
         var config = VMConfiguration(name: "Work PC", cpuCount: 6, ramSizeGB: 8, diskSizeGB: 64, diskImagePath: "/tmp/x/disk.qcow2")
         change(&config)

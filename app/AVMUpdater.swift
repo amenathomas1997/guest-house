@@ -260,6 +260,11 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.60", changes: [
+            "Export for UTM now tells you when UTM needs to be quit and opened again. UTM reads a machine's settings when it opens and keeps them until it quits. If you export a machine again while UTM is open, UTM goes on using the old settings. That is why speech in an exported machine could still sound fast after the fix in 0.4.58. When UTM is open, the export's closing words now say to quit UTM with Command-Q and open it again before you start the machine.",
+            "The sound fix from 0.4.58 is confirmed: in a machine exported again and started in a freshly opened UTM, JAWS speaks at its normal speed.",
+            "Also confirmed, on a Windows machine in daily use: with 0.4.59 Windows reports its TPM as ready and did not ask for the PIN to be set up again, and Windows apps show up in Command-Tab quickly.",
+        ]),
         ReleaseNote(version: "0.4.59", changes: [
             "Fixed: Windows 11 could not set up its security chip, the TPM, in a Guest House machine, and logged a TPM hardware error several times at every start. A part of the virtual TPM that Windows asks for was missing. It is there now, and Windows reports the TPM as ready. Thanks to Allison for finding the fault; the fix here is my own, because hers doesn't fit Guest House's engine.",
             "Because of this, Windows sets its TPM up the first time a machine starts with this version. On my test machine that went by without a word and a machine saved before the update resumed as usual. I could not test a Windows that uses a Windows Hello PIN or BitLocker. If Windows asks you to set your PIN up again, or anything else about signing in changes, please tell me.",

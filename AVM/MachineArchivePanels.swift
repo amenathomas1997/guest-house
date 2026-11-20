@@ -295,6 +295,7 @@ final class MachineArchiveController: ObservableObject {
 
         let ticker = ProgressTicker(verb: "Exporting", name: name, speaks: speaks)
         let isWindows = config.guestOS == .windows
+        let utmOpenAtStart = Self.utmIsOpen
         Task { @MainActor in
             let result = await Task.detached(priority: .userInitiated) { () throws -> UTMExport.Outcome in
                 try UTMExport.writePackage(job, to: package) { fraction in
@@ -309,6 +310,9 @@ final class MachineArchiveController: ObservableObject {
                 if outcome.tpmCarried == false, isWindows {
                     words += " One thing didn't go: the contents of its security chip, the TPM. In UTM, Windows may ask you to set up your PIN again, and if its drive is encrypted with BitLocker it will ask for the recovery key."
                 }
+                let utmWasOpen = utmOpenAtStart || Self.utmIsOpen
+                if utmWasOpen { AVMLog.write("Guest House: UTM export — UTM was open; said to quit and reopen it.") }
+                words += UTMExport.openUTMAdvice(utmWasOpen: utmWasOpen)
                 Announcer.shared.announce(words, tone: .success)
                 done?(true)
             case .failure(let error):
@@ -317,6 +321,11 @@ final class MachineArchiveController: ObservableObject {
                 done?(false)
             }
         }
+    }
+
+    /// Whether UTM is running on this Mac now (2026-11-19, UTMExport.openUTMAdvice).
+    static var utmIsOpen: Bool {
+        !NSRunningApplication.runningApplications(withBundleIdentifier: UTMExport.utmBundleIdentifier).isEmpty
     }
 
     // MARK: - Automatic backup (2026-11-01, MachineBackups.swift)

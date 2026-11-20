@@ -196,6 +196,21 @@ enum UTMExport {
     static let soundArguments = ["-audiodev", "coreaudio,id=ghaudio,out.frequency=48000",
                                  "-device", "intel-hda", "-device", "hda-output,audiodev=ghaudio"]
 
+    /// 2026-11-19: UTM reads a machine's settings when it opens and keeps
+    /// them until it quits. The user exported a machine a second time, to
+    /// the same place, with UTM opened seven seconds before the export was
+    /// done: UTM ran the new disk with the old settings (the old sound
+    /// card, so speech was still fast), and nothing said why. So the export
+    /// looks whether UTM is open, when it begins and when it ends, and says
+    /// what to do.
+    nonisolated static let utmBundleIdentifier = "com.utmapp.UTM"
+
+    /// What the export adds to its closing words; empty when UTM is closed.
+    static func openUTMAdvice(utmWasOpen: Bool) -> String {
+        guard utmWasOpen else { return "" }
+        return " UTM is open, or was while this was exporting. UTM keeps the settings of a machine it already knows until it quits, so before you start this one: quit UTM with Command-Q and open it again."
+    }
+
     static func settingsData(for configuration: VMConfiguration, drives: [Drive], appVersion: String?) throws -> Data {
         try PropertyListSerialization.data(fromPropertyList: settings(for: configuration, drives: drives, appVersion: appVersion),
                                            format: .xml, options: 0)
