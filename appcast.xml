@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.61</title>
+            <sparkle:version>81</sparkle:version>
+            <sparkle:shortVersionString>0.4.61</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>Report a Problem in the Help menu now asks which machine the problem is about, and three short questions: what you were doing, what you expected, and what happened instead. Answer what you can; each can be left empty. The report then adds the machine&#x27;s system and, if it&#x27;s running, its exact version, such as Ubuntu 26.04.1 or Windows 11 24H2, and whether VoiceOver is on. It still never has your user name or anything you typed in a machine, and nothing is sent until you send it.</li><li>If Windows Setup freezes while it restarts during an install, Guest House now says so and what to do: choose Force Stop, then start the machine again, and Setup carries on from where it was. Before, a freeze at that stage was met with silence for an hour. Thanks to Allison for finding this; the change here is my own. The advice for a freeze earlier in an install now says Force Stop too, because a frozen machine can&#x27;t answer an ordinary Stop.</li><li>Behind the scenes: every release is now also tested by typing into an Ubuntu desktop the way the machine&#x27;s window does, including Command-Option standing in for Control-Alt. If you can&#x27;t type in a Linux machine, please send Report a Problem right after it happens: on my test machines typing works, and the report is what will let me find it.</li></ul>]]></description>
+            <pubDate>Wed, 25 Nov 2026 05:22:57 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.61/GuestHouse-0.4.61.zip" sparkle:edSignature="kWA8ayNrG7No1Vd2tAWzw7fsSnzPkEG9FTbH0VsQR5MOb/48Se/GGf2TTT64n2efVCCNX0Qk/sDJWQvXZg6JDg==" length="106869088" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.60</title>
             <sparkle:version>80</sparkle:version>
             <sparkle:shortVersionString>0.4.60</sparkle:shortVersionString>
