@@ -987,9 +987,39 @@ final class VMManager: ObservableObject {
         // at minute 70 was never announced.
         var warnedAtHour = false
         let microsoftAccount = WindowsSetupAnswers.load(fromVMDirectory: runtimeDir)?.localAccount == nil
+        // THE HANG AFTER THE MARKER (2026-11-24, InstallWedgeLogic.swift;
+        // Allison's finding of 2026-11-15): the firmware hang can strike at
+        // a Setup restart after the marker too. The same 20-second samples
+        // as before the marker, said once, with Force Stop and "carries on".
+        // The report is still read every minute (every 5 after the hour).
+        var wedge = InstallWedgeSignature()
+        var saidWedge = false
+        var lastReport = Date()
+        let framePath = runtimeDir.appendingPathComponent("watchdog-screen.ppm").path
+        defer { try? FileManager.default.removeItem(atPath: framePath) }
+        avmLog("installWatchdog (after the marker): watching for the first sign-in and for a hang, every 20 s")
         while !Task.isCancelled {
-            try? await Task.sleep(nanoseconds: warnedAtHour ? 300_000_000_000 : 60_000_000_000)
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
             guard state == .running || state == .paused else { return }
+            if state == .paused {
+                wedge.reset()
+            } else if !saidWedge {
+                let frame = await captureWatchdogFrame(runtimeDir: runtimeDir)
+                let pid = runningQEMUPID
+                let cpu = await Task.detached { pid.flatMap { Self.sampleCPUPercent(pid: $0) } }.value
+                let disk = sampleDiskActivity(path: configuration.diskImagePath)
+                let reading = wedge.sample(frame: frame, cpuPercent: cpu, diskTime: disk?.mtime, diskSize: disk?.size)
+                logWedge(reading, cpu: cpu, phase: " (after the marker)")
+                if wedge.isWedged {
+                    saidWedge = true
+                    avmLog("installWatchdog: WEDGE DETECTED after the marker — announcing recovery guidance")
+                    let spoken = InstallWedgeSignature.guidance(afterMarker: true, machine: configuration.name)
+                    appendConsole("Guest House: \(spoken)\n")
+                    Announcer.shared.announce(spoken, tone: .failure)
+                }
+            }
+            guard Date().timeIntervalSince(lastReport) >= (warnedAtHour ? 300 : 60) else { continue }
+            lastReport = Date()
             let report = mtools(["mtype", "-i", "IMG", "::AVMSTATUS.TXT"], runtimeDir: runtimeDir)?.output ?? ""
             if report.contains("first-sign-in-done") {
                 // JAWS too (2026-10-29, sixth audit): with JAWS talking, the
@@ -2249,11 +2279,10 @@ final class VMManager: ObservableObject {
         stopInstallWatchdog()
         installWatchdogTask = Task { [weak self] in
             let sampleNanoseconds: UInt64 = 20_000_000_000  // 20s
-            let requiredConsecutive = 9                     // 9 × 20s ≈ 3 min
-            var previousFrame: Data? = nil
-            var previousDiskMTime: Date? = nil
-            var previousDiskSize: UInt64? = nil
-            var consecutiveWedgeSamples = 0
+            let requiredConsecutive = InstallWedgeSignature.requiredSamples   // 9 × 20s ≈ 3 min
+            // The judgement itself (2026-11-24, InstallWedgeLogic.swift): the
+            // same one now runs after Setup's marker too.
+            var wedge = InstallWedgeSignature()
             var announcedThisRun = false
             // A SETUP THAT JUST WAITS (2026-10-26, code audit): the wedge
             // test needs a busy CPU, so an error dialog in Windows' first
@@ -2282,8 +2311,7 @@ final class VMManager: ObservableObject {
                 // still frame and quiet disk are not a wedge.
                 let vmState = await MainActor.run { self.state }
                 if vmState == .paused {
-                    consecutiveWedgeSamples = 0
-                    previousFrame = nil
+                    wedge.reset()
                     continue
                 }
                 if vmState != .running {
@@ -2338,65 +2366,16 @@ final class VMManager: ObservableObject {
                 let cpu = await Task.detached { pid.flatMap { Self.sampleCPUPercent(pid: $0) } }.value
                 let disk = await MainActor.run { self.sampleDiskActivity(path: configuration.diskImagePath) }
 
-                guard let frame, let cpu, let disk else {
-                    // Can't sample -> can't judge. Reset the streak (fail toward
-                    // silence: an unjudgeable sample must not count toward an
-                    // alarm) and try again next tick.
-                    consecutiveWedgeSamples = 0
-                    avmLog("installWatchdog: sample unavailable (frame: \(frame != nil), cpu: \(cpu != nil), disk: \(disk != nil)) — streak reset")
-                    previousFrame = frame ?? previousFrame
-                    if let disk {
-                        previousDiskMTime = disk.mtime
-                        previousDiskSize = disk.size
-                    }
-                    continue
-                }
+                let reading = wedge.sample(frame: frame, cpuPercent: cpu, diskTime: disk?.mtime, diskSize: disk?.size)
+                self.logWedge(reading, cpu: cpu, phase: "")
 
-                let frameFrozen = (previousFrame != nil && frame == previousFrame)
-                previousFrame = frame
-
-                // DISK-ACTIVITY AMENDMENT: flat only when we HAVE a previous
-                // sample and neither mtime nor size moved. mtime is the primary
-                // probe (in-place rewrites move mtime without growing the
-                // file); size corroborates. The first tick can never judge
-                // flat — same rule as the frame comparison.
-                let diskFlat = (previousDiskMTime != nil
-                                && disk.mtime == previousDiskMTime
-                                && disk.size == previousDiskSize)
-                let diskMoved = (previousDiskMTime != nil && !diskFlat)
-                previousDiskMTime = disk.mtime
-                previousDiskSize = disk.size
-
-                if frameFrozen && cpu >= 90.0 && diskFlat {
-                    consecutiveWedgeSamples += 1
-                    avmLog("installWatchdog: wedge-signature sample \(consecutiveWedgeSamples)/\(requiredConsecutive) (frame frozen, cpu \(cpu)%, disk flat)")
-                } else if frameFrozen && cpu >= 90.0 && diskMoved {
-                    // The Handoff 14 §2 shape: looks exactly like the wedge on
-                    // frame+CPU, but the guest is doing real disk I/O — a
-                    // repair/update pass. DELIBERATELY SILENT (log only): the
-                    // right guidance is to wait, and silence IS the wait. A
-                    // reset here is how a guest gets bricked into WinRE.
-                    if consecutiveWedgeSamples > 0 {
-                        avmLog("installWatchdog: streak reset by disk activity")
-                    }
-                    consecutiveWedgeSamples = 0
-                    avmLog("installWatchdog: wedge-like (frame frozen, cpu \(cpu)%) but disk ACTIVE (mtime moved) — likely repair/update; waiting")
-                } else {
-                    if consecutiveWedgeSamples > 0 {
-                        avmLog("installWatchdog: signature broken (frame frozen: \(frameFrozen), cpu \(cpu)%, disk flat: \(diskFlat)) — streak reset")
-                    }
-                    consecutiveWedgeSamples = 0
-                }
-
-                if consecutiveWedgeSamples >= requiredConsecutive && !announcedThisRun {
+                if wedge.isWedged && !announcedThisRun {
                     announcedThisRun = true
                     avmLog("installWatchdog: WEDGE DETECTED — announcing recovery guidance")
                     await MainActor.run {
-                        self.appendConsole("Guest House: The Windows installation appears to be stuck (screen frozen with high CPU for about 3 minutes). To recover: stop the virtual machine, then start it again — Setup will start over from the beginning.\n")
-                        Announcer.shared.announce(
-                            "The Windows installation appears to be stuck. To recover, stop the virtual machine, then start it again. Setup will start over from the beginning.",
-                            tone: .failure
-                        )
+                        let spoken = InstallWedgeSignature.guidance(afterMarker: false, machine: configuration.name)
+                        self.appendConsole("Guest House: \(spoken)\n")
+                        Announcer.shared.announce(spoken, tone: .failure)
                     }
                     // Keep sampling (log-only) so the debug log records whether
                     // the wedge persists or the guest recovers on its own.
@@ -2515,6 +2494,23 @@ final class VMManager: ObservableObject {
     }
 
     /// Cancel the install watchdog.
+    /// The watchdog's log line for one sample (InstallWedgeSignature).
+    nonisolated private func logWedge(_ reading: InstallWedgeSignature.Reading, cpu: Double?, phase: String) {
+        switch reading {
+        case .wedgeLike(let count):
+            avmLog("installWatchdog\(phase): wedge-signature sample \(count)/\(InstallWedgeSignature.requiredSamples) (frame frozen, cpu \(cpu ?? -1)%, disk flat)")
+        case .busyWithDisk:
+            // The Handoff 14 §2 shape: frame and CPU look like the wedge,
+            // but the guest is writing its disk, a repair or update pass.
+            // DELIBERATELY SILENT: the right guidance is to wait.
+            avmLog("installWatchdog\(phase): wedge-like (frame frozen, cpu \(cpu ?? -1)%) but disk ACTIVE — likely repair/update; waiting")
+        case .normal(let broke):
+            if broke { avmLog("installWatchdog\(phase): signature broken — streak reset") }
+        case .unjudged:
+            avmLog("installWatchdog\(phase): sample unavailable — streak reset")
+        }
+    }
+
     private func stopInstallWatchdog() {
         installWatchdogTask?.cancel()
         installWatchdogTask = nil

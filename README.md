@@ -32,9 +32,11 @@ It covers everything from getting a Windows ISO to reporting problems.
 Problems are reported through this repository's
 [issues](../../issues) — and remember: if Guest House fails silently, the
 silence itself is a bug worth reporting. **Help > Report a Problem**
-puts a report on the clipboard (versions and the end of the diagnostic
-log, without your user name) and opens a new issue for you to paste it
-into.
+asks which machine it's about and three short questions, all optional,
+then puts a report on the clipboard (your answers, the machine's system
+and version, Guest House's and the Mac's versions, and the end of the
+diagnostic log, without your user name) and opens a new issue for you to
+paste it into.
 
 ## The dashboard and Settings
 

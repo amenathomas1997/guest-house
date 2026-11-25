@@ -3224,3 +3224,91 @@ final class UTMExportTests: XCTestCase {
         XCTAssertNotEqual(address, UTMExport.macAddress(for: UUID()))
     }
 }
+
+// Report a Problem's questions and machine line (2026-11-24, ProblemReportLogic).
+final class ProblemReportLogicTests: XCTestCase {
+    func testNoAnswersKeepsTheOldPrompt() {
+        let text = ProblemReportLogic.opening(answers: ["", "  ", ""], machine: nil, voiceOverOnMac: true)
+        XCTAssertTrue(text.hasPrefix("What happened, and what you expected:"))
+        XCTAssertTrue(text.contains("**The machine:** not about one machine"))
+        XCTAssertTrue(text.contains("**VoiceOver on the Mac:** on"))
+    }
+
+    func testAnswersComeWithTheirQuestions() {
+        let machine = ProblemReportLogic.Machine(system: "Ubuntu", version: "Ubuntu 26.04.1 LTS, kernel 7.0.0-44-generic", running: true)
+        let text = ProblemReportLogic.opening(answers: ["Typing in the terminal", "", "Nothing appeared"], machine: machine, voiceOverOnMac: false)
+        XCTAssertTrue(text.contains("**What were you doing?**\nTyping in the terminal"))
+        XCTAssertTrue(text.contains("**What did you expect to happen?**\n(not answered)"))
+        XCTAssertTrue(text.contains("**What happened instead?**\nNothing appeared"))
+        XCTAssertTrue(text.contains("**The machine:** Ubuntu (Ubuntu 26.04.1 LTS, kernel 7.0.0-44-generic)"))
+        XCTAssertTrue(text.contains("**VoiceOver on the Mac:** off"))
+    }
+
+    func testTheMachineLineSaysWhyThereIsNoVersion() {
+        XCTAssertEqual(ProblemReportLogic.machineLine(.init(system: "Windows", version: nil, running: false)),
+                       "Windows (not running, so its version wasn't read)")
+        XCTAssertEqual(ProblemReportLogic.machineLine(.init(system: "Fedora", version: nil, running: true)),
+                       "Fedora (it didn't say its version)")
+    }
+
+    func testAVersionIsCutToOneTidyLine() {
+        XCTAssertEqual(ProblemReportLogic.cleanVersion("Microsoft Windows 11 Pro  24H2, build 26100\r\nmore"),
+                       "Microsoft Windows 11 Pro 24H2, build 26100")
+        XCTAssertNil(ProblemReportLogic.cleanVersion(""))
+        XCTAssertNil(ProblemReportLogic.cleanVersion(nil))
+        XCTAssertNil(ProblemReportLogic.cleanVersion(String(repeating: "x", count: 300)))
+    }
+}
+
+// The install watchdog's judgement, before and after Setup's marker (2026-11-24).
+final class InstallWedgeTests: XCTestCase {
+    private let frame = Data([1, 2, 3])
+    private let time = Date(timeIntervalSince1970: 1000)
+
+    func testNineFrozenBusyQuietSamplesAfterTheFirstAreAWedge() {
+        var wedge = InstallWedgeSignature()
+        XCTAssertEqual(wedge.sample(frame: frame, cpuPercent: 99, diskTime: time, diskSize: 5), .normal(brokeStreak: false), "the first sample can't judge")
+        for n in 1...8 {
+            XCTAssertEqual(wedge.sample(frame: frame, cpuPercent: 99, diskTime: time, diskSize: 5), .wedgeLike(n))
+            XCTAssertFalse(wedge.isWedged)
+        }
+        XCTAssertEqual(wedge.sample(frame: frame, cpuPercent: 99, diskTime: time, diskSize: 5), .wedgeLike(9))
+        XCTAssertTrue(wedge.isWedged)
+    }
+
+    func testADiskThatMovesIsLeftAlone() {
+        var wedge = InstallWedgeSignature()
+        _ = wedge.sample(frame: frame, cpuPercent: 99, diskTime: time, diskSize: 5)
+        _ = wedge.sample(frame: frame, cpuPercent: 99, diskTime: time, diskSize: 5)
+        XCTAssertEqual(wedge.sample(frame: frame, cpuPercent: 99, diskTime: time.addingTimeInterval(20), diskSize: 5), .busyWithDisk)
+        XCTAssertEqual(wedge.streak, 0)
+    }
+
+    func testAMissingSampleOrAPauseStartsAgain() {
+        var wedge = InstallWedgeSignature()
+        for _ in 0..<4 { _ = wedge.sample(frame: frame, cpuPercent: 99, diskTime: time, diskSize: 5) }
+        XCTAssertEqual(wedge.streak, 3)
+        XCTAssertEqual(wedge.sample(frame: frame, cpuPercent: nil, diskTime: time, diskSize: 5), .unjudged)
+        XCTAssertEqual(wedge.streak, 0)
+        for _ in 0..<3 { _ = wedge.sample(frame: frame, cpuPercent: 99, diskTime: time, diskSize: 5) }
+        wedge.reset()
+        XCTAssertEqual(wedge.sample(frame: frame, cpuPercent: 99, diskTime: time, diskSize: 5), .normal(brokeStreak: false), "after a pause the frame is new again")
+    }
+
+    func testAnIdleOrChangingScreenIsNoWedge() {
+        var wedge = InstallWedgeSignature()
+        _ = wedge.sample(frame: frame, cpuPercent: 99, diskTime: time, diskSize: 5)
+        _ = wedge.sample(frame: frame, cpuPercent: 99, diskTime: time, diskSize: 5)
+        XCTAssertEqual(wedge.sample(frame: frame, cpuPercent: 3, diskTime: time, diskSize: 5), .normal(brokeStreak: true))
+        XCTAssertEqual(wedge.sample(frame: Data([9]), cpuPercent: 99, diskTime: time, diskSize: 5), .normal(brokeStreak: false))
+    }
+
+    func testTheGuidanceNamesForceStopAndWhatHappensNext() {
+        let after = InstallWedgeSignature.guidance(afterMarker: true, machine: "Work PC")
+        XCTAssertTrue(after.contains("Force Stop"))
+        XCTAssertTrue(after.contains("carries on from where it was"))
+        let before = InstallWedgeSignature.guidance(afterMarker: false, machine: "Work PC")
+        XCTAssertTrue(before.contains("Force Stop"))
+        XCTAssertTrue(before.contains("start over from the beginning"))
+    }
+}

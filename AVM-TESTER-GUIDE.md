@@ -1081,11 +1081,17 @@ next time you choose Start.
 
 ### Telling us about a problem
 
-Choose **Report a Problem…** from the Help menu. Guest House copies a short report
-to the clipboard (your Guest House, macOS and Mac versions, and the end of the
-diagnostic log, which never has your user name or anything you typed) and
-opens a new GitHub issue. Write what happened, paste the report with
-Command-V, and submit. Nothing is sent until you do.
+Choose **Report a Problem…** from the Help menu, right after the problem if
+you can. It asks which machine it's about, then three short questions: what
+you were doing, what you expected, and what happened instead. Answer what you
+can; each can be left empty. Guest House then copies a report to the
+clipboard: your answers, the machine's system and, if it's running, its exact
+version (Ubuntu 26.04.1, Windows 11 24H2 and so on), whether VoiceOver is on,
+your Guest House, macOS and Mac versions, and the end of the diagnostic log,
+which never has your user name or anything you typed. It opens a new GitHub
+issue: paste the report with Command-V, add a title, and submit. Nothing is
+sent until you do. Or choose **Email the Whole Log…** for the same report in a
+new email, with every log file attached.
 
 ### Resetting a virtual machine
 

@@ -280,7 +280,7 @@ enum KeyboardTestJob {
     }
 
     /// The SPICE connection, for the keyboard channel only.
-    private final class Client: NSObject, CSConnectionDelegate {
+    fileprivate final class Client: NSObject, CSConnectionDelegate {
         var connection: CSConnection?
         var input: CSInput?
         var wantsAudio = false
@@ -323,3 +323,75 @@ enum KeyboardTestJob {
         func spiceForwardedPortClosed(_ connection: CSConnection, port: CSPort) {}
     }
 }
+
+/// A machine's keyboard channel as its window has it, for live tests that
+/// type into a machine (2026-11-24, testers: "can't type in Ubuntu"). Keys
+/// go through SPICECoordinator.scancode and CSInput.send, the window's own
+/// last steps; what happens between a real key press and the window isn't
+/// covered.
+@MainActor
+final class SPICETestKeyboard {
+    private let client: KeyboardTestJob.Client
+    private let input: CSInput
+
+    private init(client: KeyboardTestJob.Client, input: CSInput) {
+        self.client = client
+        self.input = input
+    }
+
+    /// Connects to a running machine's SPICE socket; nil if its keyboard
+    /// channel doesn't open in time.
+    static func open(socket: String, seconds: Int = 30) async -> SPICETestKeyboard? {
+        let client = KeyboardTestJob.Client()
+        guard client.connect(URL(fileURLWithPath: socket)) else { return nil }
+        let deadline = Date().addingTimeInterval(TimeInterval(seconds))
+        while client.input == nil && Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        guard let input = client.input else { return nil }
+        // The channel is offered just before it connects (see runIfAsked).
+        try? await Task.sleep(for: .seconds(5))
+        return SPICETestKeyboard(client: client, input: input)
+    }
+
+    func send(_ code: Int32, down: Bool) async {
+        input.send(down ? .press : .release, code: code)
+        try? await Task.sleep(for: .milliseconds(80))
+    }
+
+    func key(_ virtualKey: Int, down: Bool) async {
+        guard let code = SPICECoordinator.scancode(forVirtualKey: virtualKey) else { return }
+        await send(Int32(code), down: down)
+    }
+
+    func tap(_ virtualKey: Int) async {
+        await key(virtualKey, down: true)
+        await key(virtualKey, down: false)
+    }
+
+    static let keys: [Character: Int] = [
+        "a": kVK_ANSI_A, "b": kVK_ANSI_B, "c": kVK_ANSI_C, "d": kVK_ANSI_D, "e": kVK_ANSI_E, "f": kVK_ANSI_F,
+        "g": kVK_ANSI_G, "h": kVK_ANSI_H, "i": kVK_ANSI_I, "j": kVK_ANSI_J, "k": kVK_ANSI_K, "l": kVK_ANSI_L,
+        "m": kVK_ANSI_M, "n": kVK_ANSI_N, "o": kVK_ANSI_O, "p": kVK_ANSI_P, "q": kVK_ANSI_Q, "r": kVK_ANSI_R,
+        "s": kVK_ANSI_S, "t": kVK_ANSI_T, "u": kVK_ANSI_U, "v": kVK_ANSI_V, "w": kVK_ANSI_W, "x": kVK_ANSI_X,
+        "y": kVK_ANSI_Y, "z": kVK_ANSI_Z, "0": kVK_ANSI_0, "1": kVK_ANSI_1, "2": kVK_ANSI_2, "3": kVK_ANSI_3,
+        "4": kVK_ANSI_4, "5": kVK_ANSI_5, "6": kVK_ANSI_6, "7": kVK_ANSI_7, "8": kVK_ANSI_8, "9": kVK_ANSI_9,
+        " ": kVK_Space, ".": kVK_ANSI_Period, "/": kVK_ANSI_Slash, "-": kVK_ANSI_Minus, "\n": kVK_Return,
+    ]
+    static let shifted: [Character: Int] = [">": kVK_ANSI_Period, "_": kVK_ANSI_Minus]
+
+    /// Types plain US text: lower-case letters, digits, space, . / - > _
+    /// and Return. Anything else is skipped.
+    func type(_ text: String) async {
+        for character in text {
+            if let vk = Self.keys[character] {
+                await tap(vk)
+            } else if let vk = Self.shifted[character] {
+                await key(kVK_Shift, down: true)
+                await tap(vk)
+                await key(kVK_Shift, down: false)
+            }
+        }
+    }
+}
+

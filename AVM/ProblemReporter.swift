@@ -25,41 +25,119 @@ enum ProblemReporter {
     static let logLines = 120
 
     static func reportAProblem() {
+        // THE QUESTIONS (2026-11-24, ProblemReportLogic): three short ones and
+        // the machine, in the same window, all optional. Fields with their
+        // questions as their labels, so VoiceOver reads each.
+        let machines = VMStore.shared?.configurations ?? []
+        let running = machines.filter { MachineSessions.shared.sessions[$0.id]?.isRunning == true }
         let alert = NSAlert()
-        alert.messageText = "Report a problem on GitHub?"
-        alert.informativeText = "Guest House puts a report on the clipboard: your Guest House, macOS and Mac versions, and the last part of the diagnostic log, which never has your user name or anything you typed. Then it opens a new GitHub issue in your browser. Describe what happened, paste the report with Command-V, and submit. Nothing is sent until you submit it, and you can read and change everything first. You need to be signed in to GitHub. Or Email the Whole Log puts every log file, zipped, in a new email in your mail app instead."
+        alert.messageText = "Report a problem"
+        alert.informativeText = "Answer what you can; every question can be left empty. Guest House then puts a report on the clipboard: your answers, the machine's system and version, your Guest House, macOS and Mac versions, and the last part of the diagnostic log, which never has your user name or anything you typed in a machine. Copy Report and Open GitHub opens a new issue in your browser: paste the report with Command-V and submit. You need to be signed in to GitHub. Or Email the Whole Log puts every log file, zipped, in a new email in your mail app. Nothing is sent until you send it, and you can read and change everything first."
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        let width: CGFloat = 380
+        func label(_ text: String) -> NSTextField {
+            let label = NSTextField(labelWithString: text)
+            label.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
+            return label
+        }
+        let machineQuestion = "Which machine is it about?"
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: width, height: 26), pullsDown: false)
+        popup.addItem(withTitle: "Not about one machine")
+        for machine in machines {
+            popup.addItem(withTitle: machine.name + (running.contains(where: { $0.id == machine.id }) ? ", running" : ""))
+        }
+        // The running machine, when there is just one: most often the one.
+        if running.count == 1, let index = machines.firstIndex(where: { $0.id == running[0].id }) {
+            popup.selectItem(at: index + 1)
+        }
+        popup.setAccessibilityLabel(machineQuestion)
+        stack.addArrangedSubview(label(machineQuestion))
+        stack.addArrangedSubview(popup)
+        var fields: [NSTextField] = []
+        for question in ProblemReportLogic.questions {
+            let field = NSTextField(frame: NSRect(x: 0, y: 0, width: width, height: 44))
+            field.usesSingleLineMode = false
+            field.cell?.wraps = true
+            field.cell?.isScrollable = false
+            field.setAccessibilityLabel(question)
+            field.translatesAutoresizingMaskIntoConstraints = false
+            field.widthAnchor.constraint(equalToConstant: width).isActive = true
+            field.heightAnchor.constraint(equalToConstant: 44).isActive = true
+            stack.addArrangedSubview(label(question))
+            stack.addArrangedSubview(field)
+            fields.append(field)
+        }
+        stack.frame = NSRect(x: 0, y: 0, width: width, height: stack.fittingSize.height)
+        alert.accessoryView = stack
         alert.addButton(withTitle: "Copy Report and Open GitHub")
         // Or the whole log by email (2026-10-30): a tester's problem took
         // Save Diagnostic Log, zipping the folder and attaching it by hand.
         alert.addButton(withTitle: "Email the Whole Log…")
         alert.addButton(withTitle: "Cancel")
+        alert.layout()
+        alert.window.initialFirstResponder = popup
         let answer = alert.runModal()
-        if answer == .alertSecondButtonReturn {
-            Task { await emailWholeLog() }
-            return
+        guard answer == .alertFirstButtonReturn || answer == .alertSecondButtonReturn else { return }
+        let answers = fields.map(\.stringValue)
+        let chosen = popup.indexOfSelectedItem > 0 ? machines[popup.indexOfSelectedItem - 1] : nil
+        let byEmail = answer == .alertSecondButtonReturn
+        Task { @MainActor in
+            let opening = ProblemReportLogic.opening(answers: answers, machine: await describe(chosen),
+                                                     voiceOverOnMac: NSWorkspace.shared.isVoiceOverEnabled)
+            if byEmail {
+                await emailWholeLog(opening: opening)
+            } else {
+                copyAndOpenGitHub(opening: opening)
+            }
         }
-        guard answer == .alertFirstButtonReturn else { return }
+    }
 
-        let report = makeReport()
+    /// The chosen machine's system, and its version from the machine
+    /// itself if it's running and answers within ten seconds.
+    private static func describe(_ configuration: VMConfiguration?) async -> ProblemReportLogic.Machine? {
+        guard let configuration else { return nil }
+        let guest = configuration.guestOS
+        var machine = ProblemReportLogic.Machine(system: guest.displayName, version: nil, running: false)
+        guard let session = MachineSessions.shared.sessions[configuration.id], session.isRunning else { return machine }
+        machine.running = true
+        let manager = session.manager
+        switch guest {
+        case .windows:
+            machine.version = ProblemReportLogic.cleanVersion(try? await manager.agentRun("powershell.exe", ["-NoProfile", "-Command", ProblemReportLogic.windowsVersionCommand], limit: .seconds(10)))
+        case .macOS:
+            break
+        default:
+            machine.version = ProblemReportLogic.cleanVersion(try? await manager.agentRun("/bin/sh", ["-c", ProblemReportLogic.linuxVersionCommand], limit: .seconds(10)))
+        }
+        AVMLog.write("Guest House: Report a Problem — about a \(guest.displayName) machine; its version \(machine.version == nil ? "wasn't read" : "was read").")
+        return machine
+    }
+
+    private static func copyAndOpenGitHub(opening: String) {
+        let report = opening + makeReport()
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(report, forType: .string)
         AVMLog.write("Guest House: Report a Problem — report copied (\(report.count) characters); opening a new GitHub issue.")
 
         var components = URLComponents(string: newIssueURL)
-        // Added to the template item, not in its place.
+        // Added to the template item, not in its place. The answers stay on
+        // the clipboard, out of the web address and the browser's history.
         var items = components?.queryItems ?? []
-        items.append(URLQueryItem(name: "body", value: "What happened, and what you expected:\n\n\n\nAVM's report (paste it below with Command-V):\n\n"))
+        items.append(URLQueryItem(name: "body", value: "Paste Guest House's report below with Command-V. It has your answers in it.\n\n"))
         components?.queryItems = items
         if let url = components?.url {
             NSWorkspace.shared.open(url)
         }
-        Announcer.shared.announce("The report is on the clipboard, and GitHub's new issue page is opening in your browser. Describe what happened, then paste the report with Command-V.", tone: .info)
+        Announcer.shared.announce("The report, with your answers, is on the clipboard, and GitHub's new issue page is opening in your browser. Paste the report with Command-V, add a title, and submit.", tone: .info)
     }
 
     /// The whole diagnostic log, zipped, in a new email in the Mac's mail
     /// app, with the short report as its text. Nothing is sent until the
     /// user sends it.
-    static func emailWholeLog() async {
+    static func emailWholeLog(opening: String = ProblemReportLogic.opening(answers: [], machine: nil, voiceOverOnMac: false)) async {
         let zip: URL
         do {
             guard let made = try await DiagnosticLogExporter.makeZip() else {
@@ -71,7 +149,7 @@ enum ProblemReporter {
             Announcer.shared.announce("The log couldn't be prepared. Reason: \(error.localizedDescription)", tone: .failure)
             return
         }
-        let text = "What happened, and what you expected:\n\n\n\n" + makeReport()
+        let text = opening + makeReport()
         if let mail = NSSharingService(named: .composeEmail), mail.canPerform(withItems: [text, zip]) {
             mail.subject = "Guest House problem report"
             mail.perform(withItems: [text, zip])

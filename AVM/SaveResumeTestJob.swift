@@ -22,6 +22,8 @@
 //   Guest House.app/Contents/MacOS/Guest House --test-screen-readers [--jaws] [--into <folder>]
 //   Guest House.app/Contents/MacOS/Guest House --test-hid-bridge --vm <folder> --guest <os>
 //   Guest House.app/Contents/MacOS/Guest House --test-background --vm <folder> --guest <os>
+//   Guest House.app/Contents/MacOS/Guest House --test-typing --vm <folder> --guest <linux os with GNOME>
+//   Guest House.app/Contents/MacOS/Guest House --test-install-watch --vm <a COPY of an installed Windows test machine>
 //
 // --test-hid-bridge: the Bluetooth path without a Bluetooth device. Adds a
 // usb-hid-bridge (Guest House's QEMU patch) with a made-up HID device, plays the
@@ -123,6 +125,7 @@
 import Foundation
 import AppKit
 import CommonCrypto
+import Carbon.HIToolbox
 
 @MainActor
 enum SaveResumeTestJob {
@@ -130,7 +133,7 @@ enum SaveResumeTestJob {
     static let flag = "--test-save-resume"
 
     static func runIfAsked(arguments: [String] = CommandLine.arguments) {
-        guard arguments.contains(flag) || arguments.contains("--test-microphone") || arguments.contains("--test-two-machines") || arguments.contains("--test-stress") || arguments.contains("--test-blue-screen") || arguments.contains("--test-machine-drives") || arguments.contains("--test-install-apps") || arguments.contains("--test-keyboard-layout") || arguments.contains("--test-control-alt") || arguments.contains("--test-utm-export")
+        guard arguments.contains(flag) || arguments.contains("--test-microphone") || arguments.contains("--test-two-machines") || arguments.contains("--test-stress") || arguments.contains("--test-blue-screen") || arguments.contains("--test-machine-drives") || arguments.contains("--test-install-apps") || arguments.contains("--test-keyboard-layout") || arguments.contains("--test-control-alt") || arguments.contains("--test-typing") || arguments.contains("--test-install-watch") || arguments.contains("--test-utm-export")
                 || arguments.contains("--test-duplicate") || arguments.contains("--test-send-file")
                 || arguments.contains("--test-linux-share") || arguments.contains("--test-ctl")
                 || arguments.contains("--test-disk-info") || arguments.contains("--run-in-guest")
@@ -209,6 +212,12 @@ enum SaveResumeTestJob {
             }
             if arguments.contains("--test-control-alt") {
                 await finish(await controlAlt(folderURL))
+            }
+            if arguments.contains("--test-typing") {
+                await finish(await typing(folderURL, guest))
+            }
+            if arguments.contains("--test-install-watch") {
+                await finish(await installWatch(folderURL))
             }
             if arguments.contains("--test-install-apps") {
                 await finish(guest == .windows ? await installApps(folderURL) : await installLinuxApps(folderURL, guest))
@@ -1991,6 +2000,162 @@ enum SaveResumeTestJob {
         _ = await exec(agent, program: "schtasks.exe", args: ["/end", "/tn", "AVMControlAltTest"])
         _ = await exec(agent, program: "schtasks.exe", args: ["/delete", "/f", "/tn", "AVMControlAltTest"])
         _ = await powershell("Remove-Item -Force -ErrorAction SilentlyContinue 'C:\\Users\\Public\\avm-control-alt.ps1','C:\\Users\\Public\\avm-control-alt-ready.txt','\(marker)'")
+        await shutDown(manager)
+        return ok
+    }
+
+    /// --test-typing (2026-11-24, testers: "can't type in Ubuntu", which
+    /// couldn't be made to happen here): a Linux machine's GNOME desktop,
+    /// typed into through the keyboard channel its window uses
+    /// (SPICETestKeyboard). Control-Alt-T must open GNOME's terminal and a
+    /// command typed into it must run. Then Command-Option-T as Guest House
+    /// sends it with the Mac's VoiceOver on (ControlAltStandIn): it must
+    /// open the terminal the same way, leave nothing held, and not open
+    /// GNOME's overview, which the Super key let go alone would. A bare
+    /// Super tap is the control: it shows the test can see the overview.
+    /// Measured by hand first in Ubuntu 26.04 with QMP keys, the same day.
+    private static func typing(_ folder: URL, _ guest: GuestOS) async -> Bool {
+        let manager = VMManager()
+        guard await start(manager, configuration(folder: folder, guest: guest)),
+              let agent = manager.guestAgentSocketPath, await waitForAgent(agent, seconds: 300) else {
+            check("the machine started and answers", false); await shutDown(manager); return false
+        }
+        func sh(_ script: String) async -> String {
+            await exec(agent, program: "/bin/sh", args: ["-c", script]) ?? ""
+        }
+        var user = ""
+        for _ in 0..<60 where user.isEmpty {
+            user = await sh(#"u=$(loginctl list-sessions --no-legend | awk '$4=="seat0"{print $3; exit}'); [ -n "$u" ] && pgrep -u "$u" -x gnome-shell >/dev/null && echo "$u""#)
+            if user.isEmpty { try? await Task.sleep(for: .seconds(5)) }
+        }
+        check("someone is signed in at GNOME's desktop", !user.isEmpty)
+        guard !user.isEmpty else { await shutDown(manager); return false }
+        // GNOME takes a little while after it starts before its shortcuts work.
+        try? await Task.sleep(for: .seconds(20))
+        // By process name, never -f: a pattern would match this script's
+        // own command line (2026-11-24). Ptyxis and its agent end with the
+        // last window (measured in Ubuntu 26.04).
+        let state = #"""
+            I=$(id -u \#(user)); O=$(runuser -u \#(user) -- env DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$I/bus gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.freedesktop.DBus.Properties.Get org.gnome.Shell OverviewActive 2>/dev/null)
+            case "$O" in *true*) printf overview;; *false*) printf desktop;; *) printf unknown;; esac
+            if pgrep -u \#(user) -x ptyxis >/dev/null || pgrep -u \#(user) -x gnome-terminal- >/dev/null || pgrep -u \#(user) -x kgx >/dev/null; then printf ' terminal'; fi
+            """#
+        func screen(waitingFor wanted: (String) -> Bool, seconds: Int = 10) async -> String {
+            var now = ""
+            for _ in 0..<seconds {
+                try? await Task.sleep(for: .seconds(1))
+                now = await sh(state)
+                if wanted(now) { break }
+            }
+            return now
+        }
+        _ = await sh("rm -f /tmp/avm-typed /tmp/avm-typed-again")
+        let before = await sh(state)
+        print("   before: \(before)")
+        check("GNOME answers about its overview", !before.hasPrefix("unknown"))
+        guard let keyboard = await SPICETestKeyboard.open(socket: manager.spiceSocketPath) else {
+            check("the machine's keyboard channel opened", false); await shutDown(manager); return false
+        }
+        check("the machine's keyboard channel opened", true)
+
+        print("== Control-Alt-T, then a command typed into the terminal")
+        await keyboard.key(kVK_Control, down: true)
+        await keyboard.key(kVK_Option, down: true)
+        await keyboard.tap(kVK_ANSI_T)
+        await keyboard.key(kVK_Option, down: false)
+        await keyboard.key(kVK_Control, down: false)
+        var now = await screen(waitingFor: { $0.contains("terminal") })
+        print("   after: \(now)")
+        check("Control-Alt-T opened a terminal", now.contains("terminal"))
+        try? await Task.sleep(for: .seconds(2))
+        await keyboard.type("echo typed > /tmp/avm-typed\n")
+        try? await Task.sleep(for: .seconds(3))
+        check("a command typed into the terminal ran", await sh("cat /tmp/avm-typed 2>/dev/null") == "typed")
+        await keyboard.type("exit\n")
+        now = await screen(waitingFor: { !$0.contains("terminal") })
+        check("exit typed into the terminal closed it", !now.contains("terminal"))
+
+        print("== Command-Option-T as Guest House sends it with VoiceOver on")
+        guard let tKey = SPICECoordinator.scancode(forVirtualKey: kVK_ANSI_T),
+              let superKey = SPICECoordinator.scancode(forVirtualKey: kVK_Command) else {
+            check("the keys have scancodes", false); await shutDown(manager); return false
+        }
+        // Option, then Command, reach the machine as Alt and Super; with T
+        // pressed, ControlAltStandIn's steps; Command's own release isn't
+        // sent again, then Option comes up (as handleKey does it).
+        await keyboard.key(kVK_Option, down: true)
+        await keyboard.send(Int32(superKey), down: true)
+        for step in ControlAltStandIn.steps(key: Int32(tKey), windowsKeyDown: Int32(superKey)) {
+            await keyboard.send(step.code, down: step.press)
+        }
+        await keyboard.key(kVK_Option, down: false)
+        now = await screen(waitingFor: { $0.contains("terminal") })
+        print("   after: \(now)")
+        check("Command-Option-T opened a terminal, as Control-Alt-T", now.contains("terminal"))
+        check("GNOME's overview didn't open", !now.hasPrefix("overview"))
+        try? await Task.sleep(for: .seconds(2))
+        await keyboard.type("echo again > /tmp/avm-typed-again\n")
+        try? await Task.sleep(for: .seconds(3))
+        check("typing afterwards is plain, with nothing held", await sh("cat /tmp/avm-typed-again 2>/dev/null") == "again")
+        await keyboard.type("exit\n")
+        _ = await screen(waitingFor: { !$0.contains("terminal") })
+
+        print("== For comparison: a bare Super tap")
+        await keyboard.tap(kVK_Command)
+        now = await screen(waitingFor: { $0.hasPrefix("overview") }, seconds: 5)
+        print("   after: \(now)")
+        check("the test can see the overview when it does open", now.hasPrefix("overview"))
+        await keyboard.tap(kVK_Escape)
+        _ = await sh("rm -f /tmp/avm-typed /tmp/avm-typed-again")
+        await shutDown(manager)
+        return ok
+    }
+
+    /// --test-install-watch (2026-11-24, InstallWedgeLogic): the watch after
+    /// Setup's marker, now sampling every 20 seconds for the firmware hang
+    /// as well as reading Setup's report. Run on a COPY of an installed
+    /// Windows whose answer volume says Setup got past specialize but not
+    /// to the first sign-in (the runner writes that), so a Start carries
+    /// Setup on. Checks the watch runs, raises no hang alarm on a healthy
+    /// Windows, still hears the first sign-in within its minute, and
+    /// leaves no picture of the screen behind. A real hang can't be made
+    /// to happen; the judgement itself is unit-tested.
+    private static func installWatch(_ folder: URL) async -> Bool {
+        let manager = VMManager()
+        let image = folder.appendingPathComponent("autounattend.img").path
+        let frame = folder.appendingPathComponent("watchdog-screen.ppm").path
+        let mtools = Bundle.main.url(forResource: "mtools", withExtension: nil)?.path ?? ""
+        func log() -> String {
+            AVMLog.currentLogURL().flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        }
+        guard await start(manager, configuration(folder: folder, guest: .windows)) else { await shutDown(manager); return false }
+        try? await Task.sleep(for: .seconds(10))
+        check("Setup is taken as carrying on", log().contains("Windows Setup is carrying on"))
+        check("the watch after the marker runs", log().contains("installWatchdog (after the marker): watching"))
+        // Four minutes of samples on a healthy Windows: 12, more than the 9 an alarm needs.
+        var sawFrame = false
+        for _ in 0..<24 {
+            try? await Task.sleep(for: .seconds(10))
+            if FileManager.default.fileExists(atPath: frame) { sawFrame = true }
+        }
+        check("it took pictures of the screen to compare", sawFrame)
+        check("no hang was announced on a healthy Windows", !log().contains("WEDGE DETECTED"))
+        // Setup's report says the first sign-in is done, as Windows writes it.
+        let report = FileManager.default.temporaryDirectory.appendingPathComponent("AVMSTATUS.TXT")
+        try? "specialize-started\r\nspecialize-done\r\nfirst-sign-in-done\r\n".write(to: report, atomically: true, encoding: .utf8)
+        let copy = Process()
+        copy.executableURL = URL(fileURLWithPath: mtools)
+        copy.arguments = ["-c", "mcopy", "-o", "-i", image, report.path, "::AVMSTATUS.TXT"]
+        try? copy.run(); copy.waitUntilExit()
+        check("the report was changed", copy.terminationStatus == 0)
+        var heard = false
+        for _ in 0..<20 where !heard {
+            try? await Task.sleep(for: .seconds(5))
+            heard = log().contains("Windows is installed and signed in")
+        }
+        check("the first sign-in is still heard within its minute or so", heard)
+        try? await Task.sleep(for: .seconds(3))
+        check("no picture of the screen is left behind", !FileManager.default.fileExists(atPath: frame))
         await shutDown(manager)
         return ok
     }

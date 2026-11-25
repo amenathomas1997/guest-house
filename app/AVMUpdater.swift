@@ -260,6 +260,11 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.61", changes: [
+            "Report a Problem in the Help menu now asks which machine the problem is about, and three short questions: what you were doing, what you expected, and what happened instead. Answer what you can; each can be left empty. The report then adds the machine's system and, if it's running, its exact version, such as Ubuntu 26.04.1 or Windows 11 24H2, and whether VoiceOver is on. It still never has your user name or anything you typed in a machine, and nothing is sent until you send it.",
+            "If Windows Setup freezes while it restarts during an install, Guest House now says so and what to do: choose Force Stop, then start the machine again, and Setup carries on from where it was. Before, a freeze at that stage was met with silence for an hour. Thanks to Allison for finding this; the change here is my own. The advice for a freeze earlier in an install now says Force Stop too, because a frozen machine can't answer an ordinary Stop.",
+            "Behind the scenes: every release is now also tested by typing into an Ubuntu desktop the way the machine's window does, including Command-Option standing in for Control-Alt. If you can't type in a Linux machine, please send Report a Problem right after it happens: on my test machines typing works, and the report is what will let me find it.",
+        ]),
         ReleaseNote(version: "0.4.60", changes: [
             "Export for UTM now tells you when UTM needs to be quit and opened again. UTM reads a machine's settings when it opens and keeps them until it quits. If you export a machine again while UTM is open, UTM goes on using the old settings. That is why speech in an exported machine could still sound fast after the fix in 0.4.58. When UTM is open, the export's closing words now say to quit UTM with Command-Q and open it again before you start the machine.",
             "The sound fix from 0.4.58 is confirmed: in a machine exported again and started in a freshly opened UTM, JAWS speaks at its normal speed.",

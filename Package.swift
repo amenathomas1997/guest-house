@@ -51,6 +51,8 @@ let package = Package(
                 "AVM/MachineArchive.swift",
                 "AVM/UTMExport.swift",
                 "AVM/QuietFailureLogic.swift",
+                "AVM/ProblemReportLogic.swift",
+                "AVM/InstallWedgeLogic.swift",
                 "AVM/RemoteDesktopAddress.swift",
                 // For its file and checksum patterns (2026-10-30).
                 "views/LinuxISODownload.swift",
