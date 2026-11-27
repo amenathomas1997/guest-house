@@ -10,6 +10,15 @@
              original project's releases are not listed: they are built for
              its own app and could not be installed over this one. -->
         <item>
+            <title>Version 0.4.62</title>
+            <sparkle:version>82</sparkle:version>
+            <sparkle:shortVersionString>0.4.62</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<ul><li>Fixed: after the Mac slept, for example with the lid closed, Windows could keep the wrong time, even the wrong date, for hours. Guest House tried to set the machine&#x27;s clock only once when the Mac woke, and gave up if Windows was slow to answer in that moment. Windows&#x27; own time service is often stopped, so nothing corrected it. Guest House now keeps trying for two minutes after a wake, and you don&#x27;t need to choose Sync now in Windows any more. Thanks to Daniel for the report.</li><li>Fixed: a Windows machine could start with its clock hours out, when Windows&#x27; time zone differs from the Mac&#x27;s. Guest House now sets the clock from the Mac&#x27;s at every start, as soon as the machine can answer.</li><li>The words when the Mac wakes no longer say the clock may take a while to catch up. Guest House only speaks about the clock if it still can&#x27;t set it after two minutes, and then says how to do it in Windows: open Settings, then Time and language, then Date and time, and choose Sync now.</li></ul>]]></description>
+            <pubDate>Fri, 27 Nov 2026 19:08:40 +0000</pubDate>
+            <enclosure url="https://github.com/amenathomas1997/guest-house/releases/download/v0.4.62/GuestHouse-0.4.62.zip" sparkle:edSignature="sWTM9KM5zMGM7EjWgiMMF7JNoUl6ImFSWFpb/Q2OPxglnKUsriniou4FDobWzYgasU+S/HgKTFDknXRvPGUVAg==" length="106879486" type="application/octet-stream" />
+        </item>
+        <item>
             <title>Version 0.4.61</title>
             <sparkle:version>81</sparkle:version>
             <sparkle:shortVersionString>0.4.61</sparkle:shortVersionString>
