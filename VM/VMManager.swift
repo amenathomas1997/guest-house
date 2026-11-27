@@ -1804,6 +1804,16 @@ final class VMManager: ObservableObject {
         UsageCountsSender.noteStart(configuration)   // fork-only-line
         appendConsole("Guest House: VM is running.\n")
         beginQMPEventMonitoring()
+        // THE CLOCK AT EVERY START (2026-11-26): Windows reads the hardware
+        // clock, which is the Mac's local time, in its own time zone, so a
+        // Windows whose zone isn't the Mac's (the Windows test machine is on
+        // UTC: 6 hours out here) starts hours wrong, and nothing put it right
+        // until its own time service ran, which on a home PC can be days.
+        // Set from the Mac's clock once the agent answers. A carried-on
+        // start sets it in resumeSavedState instead.
+        if resumePlan == nil, installComplete, configuration.guestOS != .macOS {
+            Task { [weak self] in await self?.setGuestClockOnceItAnswers() }
+        }
         // Before the guest makes a sound, and after a resume too: QEMU doesn't
         // save these.
         await applySoundLevels(configuration)
@@ -4739,17 +4749,59 @@ extension VMManager {
 extension VMManager {
     /// Sets Windows' clock to the Mac's. Returns true if the agent did it.
     @discardableResult
-    func setGuestClock() async -> Bool {
+    func setGuestClock(timeout: TimeInterval = 4) async -> Bool {
         guard let path = guestAgentSocketPath else { return false }
         let command = GuestAgent.setTimeCommand()
         do {
-            let replies = try await GuestAgent.call([command], socketPath: path)
+            let replies = try await GuestAgent.call([command], socketPath: path, timeout: timeout)
             let ok = replies.first?.contains(#""return""#) == true
             AVMLog.write("Guest House: GuestAgent — set the guest clock: \(ok ? "done" : replies.first ?? "no reply")")
             return ok
         } catch {
             AVMLog.write("Guest House: GuestAgent — couldn't set the guest clock (\(error.localizedDescription)); Windows will correct it at its next time sync.")
             return false
+        }
+    }
+}
+
+extension VMManager {
+    /// The clock after the Mac wakes (2026-11-26, Daniel's report: "the
+    /// Windows time may not be synced" at every lid open, and the clock
+    /// still wrong two hours later, a day behind). One try with 4 seconds
+    /// to answer, at the moment the machine resumes, was all there was; a
+    /// Windows busy catching up then didn't answer, and Windows' own time
+    /// service on a home PC is stopped most of the time (measured in the
+    /// Windows test machine), so nothing else put it right. Now it tries
+    /// for two minutes, every 10 seconds, with 10 seconds to answer each
+    /// time. The time sent is the Mac's at each try.
+    /// At a start: waits up to 5 minutes for the agent to answer (Windows
+    /// takes a minute or so to start it), quietly, then sets the clock.
+    func setGuestClockOnceItAnswers(within limit: TimeInterval = 300) async {
+        let deadline = Date().addingTimeInterval(limit)
+        while Date() < deadline {
+            guard state == .running else { return }
+            if await guestAgentAnswers() {
+                if await setGuestClock(timeout: 10) { return }
+            }
+            try? await Task.sleep(for: .seconds(10))
+        }
+        AVMLog.write("Guest House: GuestAgent — no answer in \(Int(limit)) seconds after the start, so the clock wasn't set")
+    }
+
+    func setGuestClockAfterWake(within limit: TimeInterval = 120) async -> Bool {
+        let deadline = Date().addingTimeInterval(limit)
+        var tries = 0
+        while true {
+            tries += 1
+            if await setGuestClock(timeout: 10) {
+                if tries > 1 { AVMLog.write("Guest House: GuestAgent — the clock was set at try \(tries) after the wake") }
+                return true
+            }
+            guard state == .running, Date() < deadline else {
+                AVMLog.write("Guest House: GuestAgent — the clock couldn't be set in \(Int(limit)) seconds after the wake (\(tries) tries)")
+                return false
+            }
+            try? await Task.sleep(for: .seconds(10))
         }
     }
 }
@@ -5410,11 +5462,13 @@ extension VMManager {
         // the Mac. The clock is set after, without holding up the start.
         // Not after a Force Stop or Quit that landed meanwhile (seventh audit).
         if carriedOn, state == .starting { Announcer.shared.announce("\(guest) is running again.", tone: .success) }
-        // The guest's clock stopped while it was saved.
+        // The guest's clock stopped while it was saved. Patiently since
+        // 2026-11-26, as after the Mac's sleep: one try at 2 seconds could
+        // miss a Windows still catching up.
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(2))
             guard let self, self.state == .running || self.state == .starting else { return }
-            await self.setGuestClock()
+            _ = await self.setGuestClockAfterWake()
         }
     }
 }

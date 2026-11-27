@@ -260,6 +260,11 @@ struct ReleaseNote {
 enum ReleaseNotes {
     /// Newest first.
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.62", changes: [
+            "Fixed: after the Mac slept, for example with the lid closed, Windows could keep the wrong time, even the wrong date, for hours. Guest House tried to set the machine's clock only once when the Mac woke, and gave up if Windows was slow to answer in that moment. Windows' own time service is often stopped, so nothing corrected it. Guest House now keeps trying for two minutes after a wake, and you don't need to choose Sync now in Windows any more. Thanks to Daniel for the report.",
+            "Fixed: a Windows machine could start with its clock hours out, when Windows' time zone differs from the Mac's. Guest House now sets the clock from the Mac's at every start, as soon as the machine can answer.",
+            "The words when the Mac wakes no longer say the clock may take a while to catch up. Guest House only speaks about the clock if it still can't set it after two minutes, and then says how to do it in Windows: open Settings, then Time and language, then Date and time, and choose Sync now.",
+        ]),
         ReleaseNote(version: "0.4.61", changes: [
             "Report a Problem in the Help menu now asks which machine the problem is about, and three short questions: what you were doing, what you expected, and what happened instead. Answer what you can; each can be left empty. The report then adds the machine's system and, if it's running, its exact version, such as Ubuntu 26.04.1 or Windows 11 24H2, and whether VoiceOver is on. It still never has your user name or anything you typed in a machine, and nothing is sent until you send it.",
             "If Windows Setup freezes while it restarts during an install, Guest House now says so and what to do: choose Force Stop, then start the machine again, and Setup carries on from where it was. Before, a freeze at that stage was met with silence for an hour. Thanks to Allison for finding this; the change here is my own. The advice for a freeze earlier in an install now says Force Stop too, because a frozen machine can't answer an ordinary Stop.",

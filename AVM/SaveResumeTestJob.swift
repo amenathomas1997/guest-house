@@ -24,6 +24,7 @@
 //   Guest House.app/Contents/MacOS/Guest House --test-background --vm <folder> --guest <os>
 //   Guest House.app/Contents/MacOS/Guest House --test-typing --vm <folder> --guest <linux os with GNOME>
 //   Guest House.app/Contents/MacOS/Guest House --test-install-watch --vm <a COPY of an installed Windows test machine>
+//   Guest House.app/Contents/MacOS/Guest House --test-wake-clock --vm <folder> --guest <os>
 //
 // --test-hid-bridge: the Bluetooth path without a Bluetooth device. Adds a
 // usb-hid-bridge (Guest House's QEMU patch) with a made-up HID device, plays the
@@ -133,7 +134,7 @@ enum SaveResumeTestJob {
     static let flag = "--test-save-resume"
 
     static func runIfAsked(arguments: [String] = CommandLine.arguments) {
-        guard arguments.contains(flag) || arguments.contains("--test-microphone") || arguments.contains("--test-two-machines") || arguments.contains("--test-stress") || arguments.contains("--test-blue-screen") || arguments.contains("--test-machine-drives") || arguments.contains("--test-install-apps") || arguments.contains("--test-keyboard-layout") || arguments.contains("--test-control-alt") || arguments.contains("--test-typing") || arguments.contains("--test-install-watch") || arguments.contains("--test-utm-export")
+        guard arguments.contains(flag) || arguments.contains("--test-microphone") || arguments.contains("--test-two-machines") || arguments.contains("--test-stress") || arguments.contains("--test-blue-screen") || arguments.contains("--test-machine-drives") || arguments.contains("--test-install-apps") || arguments.contains("--test-keyboard-layout") || arguments.contains("--test-control-alt") || arguments.contains("--test-typing") || arguments.contains("--test-install-watch") || arguments.contains("--test-wake-clock") || arguments.contains("--test-utm-export")
                 || arguments.contains("--test-duplicate") || arguments.contains("--test-send-file")
                 || arguments.contains("--test-linux-share") || arguments.contains("--test-ctl")
                 || arguments.contains("--test-disk-info") || arguments.contains("--run-in-guest")
@@ -218,6 +219,9 @@ enum SaveResumeTestJob {
             }
             if arguments.contains("--test-install-watch") {
                 await finish(await installWatch(folderURL))
+            }
+            if arguments.contains("--test-wake-clock") {
+                await finish(await wakeClock(folderURL, guest))
             }
             if arguments.contains("--test-install-apps") {
                 await finish(guest == .windows ? await installApps(folderURL) : await installLinuxApps(folderURL, guest))
@@ -2156,6 +2160,51 @@ enum SaveResumeTestJob {
         check("the first sign-in is still heard within its minute or so", heard)
         try? await Task.sleep(for: .seconds(3))
         check("no picture of the screen is left behind", !FileManager.default.fileExists(atPath: frame))
+        await shutDown(manager)
+        return ok
+    }
+
+    /// --test-wake-clock (2026-11-26, Daniel: Windows' clock wrong after
+    /// every lid open): the machine paused as SleepCoordinator pauses it
+    /// for the Mac's sleep, for three minutes, then resumed and its clock
+    /// set the way a wake now does (setGuestClockAfterWake). Checks the
+    /// clock stood still while paused, as it does in sleep, and is within
+    /// a few seconds of the Mac's afterwards. Says how far Windows' clock
+    /// was from the Mac's at the start, before Guest House touched it.
+    private static func wakeClock(_ folder: URL, _ guest: GuestOS) async -> Bool {
+        let manager = VMManager()
+        guard await start(manager, configuration(folder: folder, guest: guest)),
+              let agent = manager.guestAgentSocketPath, await waitForAgent(agent, seconds: 300) else {
+            check("the machine started and answers", false); await shutDown(manager); return false
+        }
+        try? await Task.sleep(for: .seconds(20))
+        func offset() async -> TimeInterval? {
+            guard let guestNow = await guestClock(agent, guest: guest) else { return nil }
+            return guestNow - Date().timeIntervalSince1970
+        }
+        // The clock at every start (2026-11-26): set from the Mac's once the
+        // agent answers, whatever Windows' own time zone is.
+        var atStart = await offset()
+        for _ in 0..<12 where abs(atStart ?? 999) > 5 {
+            try? await Task.sleep(for: .seconds(10))
+            atStart = await offset()
+        }
+        print(String(format: "   after the start the machine's clock is %.0f s from the Mac's", atStart ?? .nan))
+        check("the clock was set from the Mac's at the start", atStart.map { abs($0) <= 5 } ?? false)
+        do { try await manager.pauseVM() } catch { check("it paused", false); await shutDown(manager); return false }
+        try? await Task.sleep(for: .seconds(180))
+        do { try await manager.resumeVM() } catch { check("it resumed", false); await shutDown(manager); return false }
+        let behind = await offset()
+        print(String(format: "   right after the pause it is %.0f s from the Mac's", behind ?? .nan))
+        if let atStart, let behind {
+            check("the clock stood still while paused, as in the Mac's sleep", behind - atStart < -150)
+        }
+        let set = await manager.setGuestClockAfterWake()
+        check("the clock was set after the wake", set)
+        let after = await offset()
+        print(String(format: "   after it was set: %.0f s", after ?? .nan))
+        check("the clock is within 5 seconds of the Mac's", after.map { abs($0) <= 5 } ?? false)
+        check("the words if it can't be set say what to do", SleepCoordinator.clockNotSetWords(machine: "Work PC", guest: .windows).contains("Sync now"))
         await shutDown(manager)
         return ok
     }

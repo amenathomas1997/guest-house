@@ -136,24 +136,19 @@ final class SleepCoordinator {
         asleep = false
         let leftRunning = leftRunningForSleep.filter { $0.state == .running }
         leftRunningForSleep = []
-        if !leftRunning.isEmpty {
-            Task { @MainActor in
-                for manager in leftRunning { await manager.setGuestClock() }
-            }
-        }
+        for manager in leftRunning { Self.setClock(of: manager) }
         let paused = pausedForSleep.filter { $0.state == .paused }
         pausedForSleep = []
         guard !paused.isEmpty else { return }
         Task { @MainActor in
             var resumed: [String] = []
-            var clocksSet = true
             for manager in paused {
                 let name = manager.machineName
                 do {
                     try await manager.resumeVM()
-                    // The guest agent sets the clock at once (GuestAgent.swift);
-                    // without it, Windows catches up at its next time sync.
-                    if !(await manager.setGuestClock()) { clocksSet = false }
+                    // The clock, patiently, on its own (2026-11-26): said only
+                    // if it can't be set in two minutes (setClock).
+                    Self.setClock(of: manager)
                     resumed.append(name)
                 } catch {
                     Announcer.shared.announce("\(name) was paused while the Mac slept and could not be resumed. Reason: \(error.localizedDescription) Next: choose Resume in its row.", tone: .failure)
@@ -164,13 +159,25 @@ final class SleepCoordinator {
             let names = ListFormatter.localizedString(byJoining: resumed)
             let verb = resumed.count == 1 ? "was" : "were"
             let again = resumed.count == 1 ? "is" : "are"
-            Announcer.shared.announce(
-                clocksSet
-                    ? "\(names) \(verb) paused while the Mac slept, and \(again) running again."
-                    : "\(names) \(verb) paused while the Mac slept, and \(again) running again. A clock may take a while to catch up.",
-                tone: .info
-            )
+            Announcer.shared.announce("\(names) \(verb) paused while the Mac slept, and \(again) running again.", tone: .info)
         }
+    }
+
+    /// Sets a machine's clock to the Mac's after a wake, trying for two
+    /// minutes (VMManager.setGuestClockAfterWake). Only if that fails is
+    /// anything said, with what to do: "may take a while to catch up" was
+    /// wrong for Windows, whose own time service can leave it a day out.
+    private static func setClock(of manager: VMManager) {
+        Task { @MainActor in
+            guard !(await manager.setGuestClockAfterWake()), manager.state == .running else { return }
+            Announcer.shared.announce(clockNotSetWords(machine: manager.machineName, guest: manager.runningGuestOS), tone: .failure)
+        }
+    }
+
+    nonisolated static func clockNotSetWords(machine: String, guest: GuestOS?) -> String {
+        guest == .windows
+            ? "\(machine)'s clock couldn't be set after the Mac slept, so it still shows the time it was paused at, and Windows may not correct it by itself for a long time. Next: in Windows, open Settings, then Time and language, then Date and time, and choose Sync now."
+            : "\(machine)'s clock couldn't be set after the Mac slept, so it shows the time it was paused at until its own time sync corrects it."
     }
 
     /// Calls IOAllowPowerChange once, whichever caller is first.
